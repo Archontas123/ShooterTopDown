@@ -16,6 +16,7 @@ public class ShooterGame extends Game {
     public static final String TITLE = "2.5D Top-Down Shooter";
     public static final float VIEWPORT_WIDTH = 30f;
     public static final float ARENA_RADIUS = 45f;
+    public static final float ARENA_BORDER_WIDTH = 0.5f;
     
     // Global resources
     public SpriteBatch spriteBatch;

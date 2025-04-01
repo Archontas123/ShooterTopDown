@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -23,10 +22,11 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
 import com.badlogic.gdx.graphics.g3d.Material;
-import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder;
 import com.badlogic.gdx.graphics.VertexAttributes.Usage;
+import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputMultiplexer;
 
 /**
  * The main game screen.
@@ -204,12 +204,9 @@ public class GameScreen implements Screen {
      */
     private void gameOver() {
         gameOver = true;
-        
-        // TODO: Show game over screen
         System.out.println("GAME OVER! Final Score: " + gameState.getScore());
         System.out.println("Press ESC to restart");
     }
-    
     
     /**
      * Set up the 3D camera
@@ -232,33 +229,228 @@ public class GameScreen implements Screen {
         environment.add(new DirectionalLight().set(0.8f, 0.8f, 0.8f, -1f, -0.8f, -0.2f));
     }
     
-/**
-     * Create all 3D models (continued)
+    /**
+     * Creates a hexagon model with grid pattern and orange border
+     * Modified to remove orange triangle under the grid
+     */
+    private Model createHexagonModel(ModelBuilder modelBuilder, float width, float height, Material material) {
+        modelBuilder.begin();
+        
+        // Calculate vertices for a regular hexagon
+        int numVertices = 6;
+        float[] hexagonVertices = new float[numVertices * 3];
+        float[] outerHexagonVertices = new float[numVertices * 3];
+        float borderWidth = ShooterGame.ARENA_BORDER_WIDTH;  // Width of the border
+        float borderHeight = 0.15f; // Additional height for the border
+        
+        for (int i = 0; i < numVertices; i++) {
+            float angle = (float) (i * 2 * Math.PI / numVertices);
+            // Inner hexagon vertices
+            float x = (float) (width / 2 * Math.cos(angle));
+            float z = (float) (width / 2 * Math.sin(angle));
+            
+            hexagonVertices[i * 3] = x;
+            hexagonVertices[i * 3 + 1] = 0; // y is always 0 for the top face
+            hexagonVertices[i * 3 + 2] = z;
+            
+            // Outer hexagon vertices (for border)
+            float outerX = (float) ((width / 2 + borderWidth) * Math.cos(angle));
+            float outerZ = (float) ((width / 2 + borderWidth) * Math.sin(angle));
+            
+            outerHexagonVertices[i * 3] = outerX;
+            outerHexagonVertices[i * 3 + 1] = 0; // y is always 0 for the top face
+            outerHexagonVertices[i * 3 + 2] = outerZ;
+        }
+        
+        // Create top face of the hexagon
+        MeshPartBuilder builder = modelBuilder.part("top", GL20.GL_TRIANGLES, 
+                          Usage.Position | Usage.Normal | Usage.TextureCoordinates, 
+                          material);
+        
+        // Center point
+        builder.vertex(0, 0, 0, 0, 1, 0, 0.5f, 0.5f);
+        
+        // Add all vertices and create triangles (fan)
+        for (int i = 0; i < numVertices; i++) {
+            float x = hexagonVertices[i * 3];
+            float y = hexagonVertices[i * 3 + 1];
+            float z = hexagonVertices[i * 3 + 2];
+            
+            // Calculate texture coordinates
+            float u = (x / width) + 0.5f;
+            float v = (z / width) + 0.5f;
+            
+            builder.vertex(x, y, z, 0, 1, 0, u, v);
+            
+            // Create triangle between center, current vertex and next vertex
+            if (i < numVertices - 1) {
+                builder.triangle((short)0, (short)(i + 1), (short)(i + 2));
+            } else {
+                builder.triangle((short)0, (short)(i + 1), (short)1); // Connect back to the first vertex
+            }
+        }
+        
+        // Add grid lines
+        Material gridMaterial = new Material(ColorAttribute.createDiffuse(new Color(0.3f, 0.3f, 0.3f, 1f)));
+        MeshPartBuilder gridBuilder = modelBuilder.part("grid", GL20.GL_LINES, 
+                              Usage.Position | Usage.Normal, 
+                              gridMaterial);
+        
+        // Create grid lines (radial)
+        for (int i = 0; i < numVertices; i++) {
+            gridBuilder.line(0, 0.01f, 0, 
+                     hexagonVertices[i * 3], 0.01f, hexagonVertices[i * 3 + 2]);
+        }
+        
+        // Create concentric hexagons for the grid
+        int gridRings = 3;
+        for (int r = 1; r <= gridRings; r++) {
+            float ringScale = (float) r / gridRings;
+            
+            for (int i = 0; i < numVertices; i++) {
+                int nextI = (i + 1) % numVertices;
+                float x1 = hexagonVertices[i * 3] * ringScale;
+                float z1 = hexagonVertices[i * 3 + 2] * ringScale;
+                float x2 = hexagonVertices[nextI * 3] * ringScale;
+                float z2 = hexagonVertices[nextI * 3 + 2] * ringScale;
+                
+                gridBuilder.line(x1, 0.01f, z1, x2, 0.01f, z2);
+            }
+        }
+        
+        // Create the orange border (top face)
+        Material borderMaterial = new Material(ColorAttribute.createDiffuse(new Color(1.0f, 0.5f, 0.0f, 1.0f))); // Orange
+        MeshPartBuilder borderBuilder = modelBuilder.part("border-top", GL20.GL_TRIANGLES, 
+                                  Usage.Position | Usage.Normal, 
+                                  borderMaterial);
+        
+        // Create the border top face - connecting inner and outer vertices
+        for (int i = 0; i < numVertices; i++) {
+            int nextI = (i + 1) % numVertices;
+            
+            float innerX1 = hexagonVertices[i * 3];
+            float innerZ1 = hexagonVertices[i * 3 + 2];
+            float innerX2 = hexagonVertices[nextI * 3];
+            float innerZ2 = hexagonVertices[nextI * 3 + 2];
+            
+            float outerX1 = outerHexagonVertices[i * 3];
+            float outerZ1 = outerHexagonVertices[i * 3 + 2];
+            float outerX2 = outerHexagonVertices[nextI * 3];
+            float outerZ2 = outerHexagonVertices[nextI * 3 + 2];
+            
+            // Create two triangles to form a quad for each section of the border
+            // First triangle
+            borderBuilder.vertex(innerX1, borderHeight, innerZ1, 0, 1, 0);
+            borderBuilder.vertex(outerX1, borderHeight, outerZ1, 0, 1, 0);
+            borderBuilder.vertex(innerX2, borderHeight, innerZ2, 0, 1, 0);
+            borderBuilder.triangle((short)0, (short)1, (short)2);
+            
+            // Second triangle
+            borderBuilder.vertex(innerX2, borderHeight, innerZ2, 0, 1, 0);
+            borderBuilder.vertex(outerX1, borderHeight, outerZ1, 0, 1, 0);
+            borderBuilder.vertex(outerX2, borderHeight, outerZ2, 0, 1, 0);
+            borderBuilder.triangle((short)3, (short)4, (short)5);
+        }
+        
+        // Create the border outer side faces
+        for (int i = 0; i < numVertices; i++) {
+            int nextI = (i + 1) % numVertices;
+            MeshPartBuilder borderSideBuilder = modelBuilder.part("border-side" + i, GL20.GL_TRIANGLES, 
+                                      Usage.Position | Usage.Normal, 
+                                      borderMaterial);
+            
+            float outerX1 = outerHexagonVertices[i * 3];
+            float outerZ1 = outerHexagonVertices[i * 3 + 2];
+            float outerX2 = outerHexagonVertices[nextI * 3];
+            float outerZ2 = outerHexagonVertices[nextI * 3 + 2];
+            
+            // Create a rectangle for each outer side face
+            borderSideBuilder.rect(
+                outerX1, borderHeight, outerZ1,          // top-left
+                outerX1, -height, outerZ1,              // bottom-left
+                outerX2, -height, outerZ2,              // bottom-right
+                outerX2, borderHeight, outerZ2,          // top-right
+                0, 0, -1                               // normal (facing outward)
+            );
+        }
+        
+        // Create the border inner side faces (connecting the border to the main platform)
+        for (int i = 0; i < numVertices; i++) {
+            int nextI = (i + 1) % numVertices;
+            MeshPartBuilder borderInnerSideBuilder = modelBuilder.part("border-inner-side" + i, GL20.GL_TRIANGLES, 
+                                          Usage.Position | Usage.Normal, 
+                                          borderMaterial);
+            
+            float innerX1 = hexagonVertices[i * 3];
+            float innerZ1 = hexagonVertices[i * 3 + 2];
+            float innerX2 = hexagonVertices[nextI * 3];
+            float innerZ2 = hexagonVertices[nextI * 3 + 2];
+            
+            // Create a rectangle for each inner side face (vertical wall of border)
+            borderInnerSideBuilder.rect(
+                innerX1, borderHeight, innerZ1,         // top-left
+                innerX1, 0, innerZ1,                    // bottom-left
+                innerX2, 0, innerZ2,                    // bottom-right
+                innerX2, borderHeight, innerZ2,         // top-right
+                0, 0, 1                                // normal (facing inward)
+            );
+        }
+        
+        // Add side faces to give the hexagon some thickness
+        for (int i = 0; i < numVertices; i++) {
+            int nextI = (i + 1) % numVertices;
+            MeshPartBuilder sideBuilder = modelBuilder.part("side" + i, GL20.GL_TRIANGLES, 
+                                  Usage.Position | Usage.Normal, 
+                                  material);
+            
+            float x1 = hexagonVertices[i * 3];
+            float z1 = hexagonVertices[i * 3 + 2];
+            float x2 = hexagonVertices[nextI * 3];
+            float z2 = hexagonVertices[nextI * 3 + 2];
+            
+            // Create a rectangle for each side face
+            sideBuilder.rect(
+                x1, 0, z1,                // top-left
+                x1, -height, z1,          // bottom-left
+                x2, -height, z2,          // bottom-right
+                x2, 0, z2,                // top-right
+                0, 0, -1                  // normal (facing outward)
+            );
+        }
+        
+        // MODIFIED: Don't create bottom face to avoid orange triangles
+        // We'll create a single solid bottom face to avoid the triangular pattern
+
+
+        return modelBuilder.end();
+    }
+
+    /**
+     * Create all 3D models
      */
     private void createModels() {
         try {
             Gdx.app.log("GameScreen", "Creating 3D models...");
             ModelBuilder modelBuilder = new ModelBuilder();
             
-            // Create ground model
+            // Create ground model (hexagon instead of cylinder)
             Gdx.app.log("GameScreen", "Creating ground model...");
-            groundModel = modelBuilder.createCylinder(
-                ShooterGame.ARENA_RADIUS * 2, 0.1f, ShooterGame.ARENA_RADIUS * 2,
-                32,
-                new Material(ColorAttribute.createDiffuse(Color.DARK_GRAY)),
-                Usage.Position | Usage.Normal
+            groundModel = createHexagonModel(
+                modelBuilder, 
+                ShooterGame.ARENA_RADIUS * 2, 
+                0.1f,
+                new Material(ColorAttribute.createDiffuse(Color.DARK_GRAY))
             );
             groundInstance = new ModelInstance(groundModel);
             groundInstance.transform.translate(0, -0.05f, 0);
             Gdx.app.log("GameScreen", "Ground model created successfully");
         
-            // Create arena boundary model
-            arenaModel = modelBuilder.createCylinder(
-                ShooterGame.ARENA_RADIUS * 2, 0.1f, ShooterGame.ARENA_RADIUS * 2,
-                32,
-                new Material(ColorAttribute.createDiffuse(new Color(0xf39c12ff)), 
-                            ColorAttribute.createEmissive(new Color(0xe67e22ff))),
-                Usage.Position | Usage.Normal
+            // Create arena boundary model (hexagon instead of cylinder)
+            arenaModel = createHexagonModel(
+                modelBuilder, 
+                ShooterGame.ARENA_RADIUS * 2, 
+                0.1f,
+                new Material(ColorAttribute.createDiffuse(new Color(0.6f, 0.6f, 0.6f, 1f)))
             );
             arenaBoundaryInstance = new ModelInstance(arenaModel);
             arenaBoundaryInstance.transform.translate(0, 0.1f, 0);
@@ -334,7 +526,10 @@ public class GameScreen implements Screen {
             // Render 2D elements
             renderHUD();
             
-            // Always render debug info so we can see something
+            // Check for restart input
+            if (gameOver && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                restartGame();
+            }
             
             // Check for GL errors
             DebugUtils.checkGLError("GameScreen.render");
@@ -404,7 +599,9 @@ public class GameScreen implements Screen {
             if (remove) {
                 // Check if explosive for explosion effect
                 if (projectile.isExplosive()) {
-                    createExplosion(projectile.getPosition().x, projectile.getPosition().y);
+                    // Create a grenade explosion if it's from a player grenade, or regular explosion otherwise
+                    createExplosion(projectile.getPosition().x, projectile.getPosition().y, 
+                             projectile.isFromGrenade());
                 }
                 
                 // Remove projectile
@@ -473,7 +670,8 @@ public class GameScreen implements Screen {
                     return; // Will be removed in the updateProjectiles method
                 } else {
                     // Explode immediately
-                    createExplosion(projectile.getPosition().x, projectile.getPosition().y);
+                    createExplosion(projectile.getPosition().x, projectile.getPosition().y, 
+                             projectile.isFromGrenade());
                     return; // Will be removed in the updateProjectiles method
                 }
             }
@@ -482,19 +680,26 @@ public class GameScreen implements Screen {
     
     /**
      * Create an explosion at the specified position
+     * @param isGrenade whether this is a grenade explosion (more powerful)
      */
-    private void createExplosion(float x, float y) {
-        Explosion explosion = new Explosion(x, y);
+    private void createExplosion(float x, float y, boolean isGrenade) {
+        Explosion explosion = new Explosion(x, y, isGrenade);
         
         // Create model instance
         ModelInstance instance = new ModelInstance(explosionModel);
         instance.transform.setToTranslation(x, 0.5f, y);
+        
+        // Scale the model based on whether it's a grenade (3x larger)
+        if (isGrenade) {
+            instance.transform.scale(3.0f, 3.0f, 3.0f);
+        }
+        
         explosion.setModelInstance(instance);
         
         gameState.getExplosions().add(explosion);
         
         // Screen shake effect
-        shakeCamera(0.3f, 300);
+        shakeCamera(isGrenade ? 0.9f : 0.3f, isGrenade ? 500 : 300);
     }
     
     /**
@@ -525,10 +730,18 @@ public class GameScreen implements Screen {
                 // Update model instance scale and opacity
                 if (explosion.getModelInstance() != null) {
                     float scale = explosion.getRadius() / explosion.getMaxRadius();
-                    explosion.getModelInstance().transform.setToTranslation(
-                        explosion.getPosition().x, 0.5f, explosion.getPosition().y
-                    );
-                    explosion.getModelInstance().transform.scale(scale, scale, scale);
+                    
+                    // For grenade explosions, we already scaled the initial model, so we don't need to adjust here
+                    if (!explosion.isGrenade()) {
+                        explosion.getModelInstance().transform.setToTranslation(
+                            explosion.getPosition().x, 0.5f, explosion.getPosition().y
+                        );
+                        explosion.getModelInstance().transform.scale(scale, scale, scale);
+                    } else {
+                        explosion.getModelInstance().transform.setToTranslation(
+                            explosion.getPosition().x, 0.5f, explosion.getPosition().y
+                        );
+                    }
                     
                     // Can't update opacity directly through transform, would need to modify material
                 }
@@ -585,14 +798,6 @@ public class GameScreen implements Screen {
         
         try {
             modelBatch.begin(camera);
-            
-            // Debug rendering - add a simple red box at origin to test rendering
-            ShapeRenderer debugRenderer = new ShapeRenderer();
-            debugRenderer.setProjectionMatrix(camera.combined);
-            debugRenderer.begin(ShapeRenderer.ShapeType.Filled);
-            debugRenderer.setColor(Color.RED);
-            debugRenderer.box(0, 0, 0, 2, 2, 2);
-            debugRenderer.end();
             
             // Render ground and arena
             if (groundInstance != null) {
@@ -751,7 +956,10 @@ public class GameScreen implements Screen {
     @Override
     public void show() {
         // Called when this screen becomes the current screen
-        Gdx.input.setInputProcessor(stage);
+        InputMultiplexer inputMultiplexer = new InputMultiplexer();
+        inputMultiplexer.addProcessor(stage);
+        inputMultiplexer.addProcessor(inputHandler);
+        Gdx.input.setInputProcessor(inputMultiplexer);
     }
     
     @Override
@@ -785,8 +993,6 @@ public class GameScreen implements Screen {
             shapeRenderer.dispose();
             stage.dispose();
             font.dispose();
-            
-
             
             // Dispose models (with null checks)
             if (groundModel != null) groundModel.dispose();

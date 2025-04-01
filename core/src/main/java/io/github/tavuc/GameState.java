@@ -80,34 +80,118 @@ public class GameState {
      */
     private void generateBuildings() {
         // Create buildings
-        for (int i = 0; i < 15; i++) {
+        buildings.clear();
+        int attempts = 0;
+        int maxAttempts = 100;
+        
+        for (int i = 0; i < 15 && attempts < maxAttempts; attempts++) {
             // Random position within arena (with margin)
             float angle = (float) (Math.random() * Math.PI * 2);
-            float distance = (float) (Math.random() * (ShooterGame.ARENA_RADIUS * 0.8));
+            float distance = (float) (Math.random() * (ShooterGame.ARENA_RADIUS * 0.7f));
             float x = (float) (Math.cos(angle) * distance);
             float y = (float) (Math.sin(angle) * distance);
             
             float size = (float) (Math.random() * 3 + 1);
             float height = (float) (Math.random() * 3 + 2);
             
-            buildings.add(new Building(x, y, size, height));
+            // Check if this building would overlap with player spawn point
+            if (Math.sqrt(x*x + y*y) < 5) {
+                // Too close to center, try again
+                continue;
+            }
+            
+            // Check if this building overlaps with existing buildings
+            boolean overlaps = false;
+            for (Building existing : buildings) {
+                float dx = existing.getPosition().x - x;
+                float dy = existing.getPosition().y - y;
+                float minDistance = (existing.getSize() + size) / 2 + 1f;
+                
+                if (Math.sqrt(dx*dx + dy*dy) < minDistance) {
+                    overlaps = true;
+                    break;
+                }
+            }
+            
+            if (!overlaps) {
+                buildings.add(new Building(x, y, size, height));
+                i++; // Only increment i if we successfully added a building
+            }
         }
     }
     
     /**
-     * Spawn a new enemy at a random position
+     * Helper method to get a point on the edge of the hexagon
+     * Takes into account the border width to spawn enemies inside the playable area
+     */
+    private Vector2 getPointOnHexagonEdge(float angle) {
+        // For a regular hexagon
+        float sideAngle = (float) (Math.PI / 3); // 60 degrees
+        float adjustedAngle = angle;
+        
+        // Find which side of the hexagon this angle corresponds to
+        int side = (int) (adjustedAngle / sideAngle);
+        if (side >= 6) side = 0;
+        
+        // Calculate the two vertices of that side
+        float angle1 = side * sideAngle;
+        float angle2 = (side + 1) * sideAngle;
+        
+        float borderWidth = ShooterGame.ARENA_BORDER_WIDTH; // Must match the border width in createHexagonModel
+        float effectiveRadius = ShooterGame.ARENA_RADIUS * 0.8f - borderWidth;
+        
+        float x1 = (float) (effectiveRadius * Math.cos(angle1));
+        float y1 = (float) (effectiveRadius * Math.sin(angle1));
+        float x2 = (float) (effectiveRadius * Math.cos(angle2));
+        float y2 = (float) (effectiveRadius * Math.sin(angle2));
+        
+        // Calculate how far along the side this angle is
+        float t = (adjustedAngle - angle1) / sideAngle;
+        if (t > 1) t = 1;
+        if (t < 0) t = 0;
+        
+        // Interpolate between the two vertices
+        float x = x1 + t * (x2 - x1);
+        float y = y1 + t * (y2 - y1);
+        
+        return new Vector2(x, y);
+    }
+    
+    /**
+     * Spawn a new enemy at a random position on the hexagon edge
+     * Takes into account the border width
      */
     public void spawnEnemy() {
         // Generate position away from player (on edge of arena)
         float angle = (float) (Math.random() * Math.PI * 2);
-        float x = (float) (Math.cos(angle) * (ShooterGame.ARENA_RADIUS * 0.8));
-        float y = (float) (Math.sin(angle) * (ShooterGame.ARENA_RADIUS * 0.8));
+        
+        // Get point on hexagon edge, inside the border
+        Vector2 position = getPointOnHexagonEdge(angle);
+        
+        // Check for collision with buildings
+        boolean collides = false;
+        for (Building building : buildings) {
+            float dx = building.getPosition().x - position.x;
+            float dy = building.getPosition().y - position.y;
+            float minDistance = building.getSize() / 2 + 0.8f; // 0.8 is enemy size
+            
+            if (Math.sqrt(dx*dx + dy*dy) < minDistance) {
+                collides = true;
+                break;
+            }
+        }
+        
+        // If collision detected, try another position
+        if (collides) {
+            spawnEnemy(); // Recursive call to try again
+            return;
+        }
         
         // Choose enemy type
         boolean isFast = Math.random() > 0.7;
         
         // Create and add enemy
-        Enemy enemy = new Enemy(x, y, isFast);
+        Enemy enemy = new Enemy(position.x, position.y, isFast);
         enemies.add(enemy);
     }
     

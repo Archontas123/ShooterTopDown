@@ -20,6 +20,7 @@ public class Projectile {
     private float maxDistance;
     private boolean isExplosive;
     private boolean isParticle;
+    private boolean isFromGrenade; // Flag to determine if this is from a grenade (for enhanced explosions)
     
     // Bounce animation for grenades
     private float bounceHeight;
@@ -44,6 +45,16 @@ public class Projectile {
     }
     
     /**
+     * Create a new projectile
+     * @param isFromGrenade Whether this is from a player grenade (for enhanced explosions)
+     */
+    public Projectile(float x, float y, float angle, float speed, int damage, 
+                     int color, boolean isExplosive, boolean isFromGrenade) {
+        this(x, y, angle, speed, damage, color, isExplosive, isExplosive ? 60 : 0);
+        this.isFromGrenade = isFromGrenade;
+    }
+    
+    /**
      * Create a new projectile with custom timer
      */
     public Projectile(float x, float y, float angle, float speed, int damage, 
@@ -60,6 +71,7 @@ public class Projectile {
         this.maxDistance = isExplosive ? 20 : 30; // Grenades have shorter range
         this.isExplosive = isExplosive;
         this.isParticle = false;
+        this.isFromGrenade = false; // Default to false
         
         // Set bounce animation for grenades
         this.bounceHeight = isExplosive ? 0.5f : 0.5f;
@@ -88,10 +100,29 @@ public class Projectile {
         distance = 0;
         maxDistance = 0;
         isExplosive = false;
+        isFromGrenade = false;
         bounceHeight = 0;
         bounceSpeed = 0;
         bounceDirection = 0;
         timer = 0;
+    }
+    
+    /**
+     * Check if a point is inside the hexagonal arena
+     * Takes into account the border width
+     */
+    private boolean isInsideHexagon(float x, float y, float hexRadius) {
+        // For a regular hexagon, we can use this formula to determine if a point is inside
+        // Math based on: distance in "hex space" <= radius
+        float q = x * (2f/3f);
+        float r = (-x/3f) + (float)(Math.sqrt(3f)/3f) * y;
+        float s = (-x/3f) - (float)(Math.sqrt(3f)/3f) * y;
+        
+        float distance = Math.max(Math.abs(q), Math.max(Math.abs(r), Math.abs(s)));
+        float borderWidth = ShooterGame.ARENA_BORDER_WIDTH; // Must match the border width in createHexagonModel
+        float adjustedRadius = hexRadius - borderWidth;
+        
+        return distance <= adjustedRadius;
     }
     
     /**
@@ -135,14 +166,9 @@ public class Projectile {
         float dy = position.y - playerPos.y;
         distance = (float) Math.sqrt(dx * dx + dy * dy);
         
-        // Check for arena boundary
-        float distanceFromCenter = (float) Math.sqrt(
-            position.x * position.x + 
-            position.y * position.y
-        );
-        
-        if (distanceFromCenter > ShooterGame.ARENA_RADIUS) {
-            return true; // Will be removed and an explosion might be created
+        // Check for arena boundary using hexagon collision
+        if (!isInsideHexagon(position.x, position.y, ShooterGame.ARENA_RADIUS)) {
+            return true; // Will be removed and an explosion might be created for grenades
         }
         
         // Check for building collisions
@@ -175,6 +201,13 @@ public class Projectile {
         return distanceSquared <= (radius * radius);
     }
     
+    /**
+     * Set the timer for this projectile
+     */
+    public void setTimer(int timer) {
+        this.timer = timer;
+    }
+    
     // Getters and setters
     
     public Vector2 getPosition() {
@@ -199,6 +232,10 @@ public class Projectile {
     
     public boolean isParticle() {
         return isParticle;
+    }
+    
+    public boolean isFromGrenade() {
+        return isFromGrenade;
     }
     
     public float getBounceHeight() {

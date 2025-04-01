@@ -23,11 +23,26 @@ public class InputHandler extends InputAdapter {
         this.gameScreen = gameScreen;
         this.gameState = game.getGameState();
         this.moveDirection = new Vector2();
+    }
+    
+    /**
+     * Check if a point is inside the hexagonal arena
+     * Takes into account the border width with improved boundary checking
+     */
+    private boolean isInsideHexagon(float x, float y, float hexRadius) {
+        // For a regular hexagon, we can use this formula to determine if a point is inside
+        // Math based on: distance in "hex space" <= radius
+        float q = x * (2f/3f);
+        float r = (-x/3f) + (float)(Math.sqrt(3f)/3f) * y;
+        float s = (-x/3f) - (float)(Math.sqrt(3f)/3f) * y;
         
-        // Set up input processing
-        InputMultiplexer inputMultiplexer = new InputMultiplexer();
-        inputMultiplexer.addProcessor(this);
-        Gdx.input.setInputProcessor(inputMultiplexer);
+        float distance = Math.max(Math.abs(q), Math.max(Math.abs(r), Math.abs(s)));
+        
+        // Use a stricter boundary to ensure the player can't cross the border
+        // The player radius (0.4f) plus some margin
+        float effectiveRadius = hexRadius - ShooterGame.ARENA_BORDER_WIDTH - 0.8f;
+        
+        return distance <= effectiveRadius;
     }
     
     /**
@@ -63,18 +78,16 @@ public class InputHandler extends InputAdapter {
             float newX = player.getPosition().x + moveDirection.x * moveSpeed;
             float newY = player.getPosition().y + moveDirection.y * moveSpeed;
             
-            // Check arena boundaries
+            // Check arena boundaries with stricter collision
             boolean canMoveX = true;
             boolean canMoveY = true;
             
-            float distanceFromCenterX = (float) Math.sqrt(newX * newX + player.getPosition().y * player.getPosition().y);
-            float distanceFromCenterY = (float) Math.sqrt(player.getPosition().x * player.getPosition().x + newY * newY);
-            
-            if (distanceFromCenterX > ShooterGame.ARENA_RADIUS - 1) {
+            // Use hexagon boundary check instead of circular distance
+            if (!isInsideHexagon(newX, player.getPosition().y, ShooterGame.ARENA_RADIUS)) {
                 canMoveX = false;
             }
             
-            if (distanceFromCenterY > ShooterGame.ARENA_RADIUS - 1) {
+            if (!isInsideHexagon(player.getPosition().x, newY, ShooterGame.ARENA_RADIUS)) {
                 canMoveY = false;
             }
             
@@ -108,6 +121,30 @@ public class InputHandler extends InputAdapter {
             for (Projectile projectile : projectiles) {
                 gameState.getProjectiles().add(projectile);
             }
+        }
+        
+        // Handle keyboard inputs for actions
+        if (Gdx.input.isKeyJustPressed(Keys.G) && !gameScreen.isGameOver()) {
+            throwGrenade();
+        }
+        
+        if (Gdx.input.isKeyJustPressed(Keys.R) && !gameScreen.isGameOver()) {
+            reload();
+        }
+        
+        if (Gdx.input.isKeyJustPressed(Keys.SPACE) && !gameScreen.isGameOver()) {
+            performDash();
+        }
+        
+        // Weapon switching
+        if (Gdx.input.isKeyJustPressed(Keys.NUM_1) && !gameScreen.isGameOver()) {
+            switchWeapon(WeaponType.PISTOL);
+        } else if (Gdx.input.isKeyJustPressed(Keys.NUM_2) && !gameScreen.isGameOver()) {
+            switchWeapon(WeaponType.SHOTGUN);
+        } else if (Gdx.input.isKeyJustPressed(Keys.NUM_3) && !gameScreen.isGameOver()) {
+            switchWeapon(WeaponType.RIFLE);
+        } else if (Gdx.input.isKeyJustPressed(Keys.NUM_4) && !gameScreen.isGameOver()) {
+            switchWeapon(WeaponType.LAUNCHER);
         }
     }
     
@@ -168,34 +205,10 @@ public class InputHandler extends InputAdapter {
         // Store key state
         gameState.getKeys().put(keycode, true);
         
-        // Handle special keys
-        switch (keycode) {
-            case Keys.G:
-                throwGrenade();
-                break;
-            case Keys.R:
-                reload();
-                break;
-            case Keys.SPACE:
-                performDash();
-                break;
-            case Keys.NUM_1:
-                switchWeapon(WeaponType.PISTOL);
-                break;
-            case Keys.NUM_2:
-                switchWeapon(WeaponType.SHOTGUN);
-                break;
-            case Keys.NUM_3:
-                switchWeapon(WeaponType.RIFLE);
-                break;
-            case Keys.NUM_4:
-                switchWeapon(WeaponType.LAUNCHER);
-                break;
-            case Keys.ESCAPE:
-                if (gameScreen.isGameOver()) {
-                    gameScreen.restartGame();
-                }
-                break;
+        // Special handling for restart
+        if (keycode == Keys.ESCAPE && gameScreen.isGameOver()) {
+            gameScreen.restartGame();
+            return true;
         }
         
         return true;
@@ -270,7 +283,7 @@ public class InputHandler extends InputAdapter {
         float dashAngle = player.getRotation();
         
         if (moveDirection.len2() > 0) {
-            dashAngle = moveDirection.angle() * (float)(Math.PI / 180);
+            dashAngle = (float) Math.atan2(moveDirection.y, moveDirection.x);
         }
         
         float dashDistance = 5;

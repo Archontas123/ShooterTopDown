@@ -133,6 +133,24 @@ public class Player {
     }
     
     /**
+     * Check if a point is inside the hexagonal arena
+     * Takes into account the border width
+     */
+    private boolean isInsideHexagon(float x, float y, float hexRadius) {
+        // For a regular hexagon, we can use this formula to determine if a point is inside
+        // Math based on: distance in "hex space" <= radius
+        float q = x * (2f/3f);
+        float r = (-x/3f) + (float)(Math.sqrt(3f)/3f) * y;
+        float s = (-x/3f) - (float)(Math.sqrt(3f)/3f) * y;
+        
+        float distance = Math.max(Math.abs(q), Math.max(Math.abs(r), Math.abs(s)));
+        float borderWidth = ShooterGame.ARENA_BORDER_WIDTH; // Must match the border width in createHexagonModel
+        float adjustedRadius = hexRadius - borderWidth;
+        
+        return distance <= adjustedRadius;
+    }
+    
+    /**
      * Fire the current weapon
      */
     public Projectile[] fire() {
@@ -231,7 +249,8 @@ public class Player {
         float dashAngle = rotation;
         
         if (moveDirection.len2() > 0) {
-            dashAngle = moveDirection.angle() * (float)(Math.PI / 180);
+            // Use actual move direction for dash, not the angle in degrees
+            dashAngle = (float) Math.atan2(moveDirection.y, moveDirection.x);
         }
         
         // Apply dash movement
@@ -240,12 +259,28 @@ public class Player {
         float targetY = position.y + (float) Math.sin(dashAngle) * dashDistance;
         
         // Ensure player doesn't dash outside arena
-        float distanceFromCenter = (float) Math.sqrt(targetX * targetX + targetY * targetY);
-        if (distanceFromCenter > ShooterGame.ARENA_RADIUS - 1) {
-            // Scale back the dash to stay inside arena
-            float scale = (ShooterGame.ARENA_RADIUS - 1) / distanceFromCenter;
-            targetX = position.x + (float)(Math.cos(dashAngle) * dashDistance * scale);
-            targetY = position.y + (float)(Math.sin(dashAngle) * dashDistance * scale);
+        if (!isInsideHexagon(targetX, targetY, ShooterGame.ARENA_RADIUS)) {
+            // Adjust the dash to stay inside arena
+            // Binary search to find the farthest valid point
+            float low = 0;
+            float high = dashDistance;
+            float mid;
+            
+            for (int i = 0; i < 10; i++) { // 10 iterations should be enough for precision
+                mid = (low + high) / 2;
+                float testX = position.x + (float) Math.cos(dashAngle) * mid;
+                float testY = position.y + (float) Math.sin(dashAngle) * mid;
+                
+                if (isInsideHexagon(testX, testY, ShooterGame.ARENA_RADIUS)) {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+            }
+            
+            // Use the best approximation
+            targetX = position.x + (float) Math.cos(dashAngle) * low;
+            targetY = position.y + (float) Math.sin(dashAngle) * low;
         }
         
         // Apply dash

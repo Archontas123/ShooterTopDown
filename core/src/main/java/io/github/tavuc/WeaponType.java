@@ -21,7 +21,8 @@ public enum WeaponType {
             case RIFLE:
                 return new WeaponStats(15, 8, 70, 0.4f, 0x2ecc71, 1, 0);
             case LAUNCHER:
-                return new WeaponStats(90, 60, 120, 0.25f, 0xe74c3c, 1, 0);
+                // Buffed damage from 90 to 150
+                return new WeaponStats(150, 60, 120, 0.25f, 0xe74c3c, 1, 0);
             default:
                 throw new IllegalArgumentException("Unknown weapon type: " + type);
         }

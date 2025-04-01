@@ -17,20 +17,33 @@ public class Explosion {
     private int life;
     private int damage;
     private boolean damageDealt;
+    private boolean isGrenade; // Whether this is a grenade explosion (3x more powerful)
     
     // 3D model
     private ModelInstance modelInstance;
     
     /**
      * Create a new explosion
+     * @param isGrenade Whether this is a grenade explosion (more powerful)
      */
-    public Explosion(float x, float y) {
+    public Explosion(float x, float y, boolean isGrenade) {
         position = new Vector2(x, y);
         radius = 0.5f;
-        maxRadius = 5.0f;
-        growth = 0.3f;
-        life = 20;
-        damage = 100;
+        this.isGrenade = isGrenade;
+        
+        // Grenades are 3x more powerful with larger radius
+        if (isGrenade) {
+            maxRadius = 15.0f;
+            growth = 0.6f;
+            life = 30;
+            damage = 300;  // Triple damage
+        } else {
+            maxRadius = 5.0f; // Launcher explosions are larger than before
+            growth = 0.3f;
+            life = 20;
+            damage = 150;  // Buffed from 100
+        }
+        
         damageDealt = false;
         
         // Note: Model instance will be set externally by the renderer
@@ -115,7 +128,11 @@ public class Explosion {
     }
     
     public float getOpacity() {
-        return (float) life / 20.0f;
+        return (float) life / (isGrenade ? 30.0f : 20.0f);
+    }
+    
+    public boolean isGrenade() {
+        return isGrenade;
     }
     
     public void setModelInstance(ModelInstance modelInstance) {
