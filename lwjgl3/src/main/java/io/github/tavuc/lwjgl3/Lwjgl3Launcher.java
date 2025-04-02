@@ -3,7 +3,7 @@ package io.github.tavuc.lwjgl3;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 
-import io.github.tavuc.ShooterGame;
+import io.github.tavuc.platformer.PlatformerGame;
 
 public class Lwjgl3Launcher {
     public static void main(String[] args) {
@@ -12,6 +12,6 @@ public class Lwjgl3Launcher {
         config.setWindowedMode(1280, 720);
         config.useVsync(true);
         config.setForegroundFPS(60);
-        new Lwjgl3Application(new ShooterGame(), config);
+        new Lwjgl3Application(new PlatformerGame(), config);
     }
 }
