@@ -4,6 +4,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g3d.ModelBatch;
 import com.badlogic.gdx.math.Vector3;
 import io.github.tavuc.platformer.PlatformerGame;
@@ -23,6 +25,11 @@ public class GameScreen implements Screen {
     private GameWorld gameWorld;
     private Player player;
     
+    // Add respawn UI elements
+    private BitmapFont font;
+    private SpriteBatch batch;
+    private Vector3 spawnPosition;
+    
     /**
      * Creates a new game screen.
      * 
@@ -33,6 +40,16 @@ public class GameScreen implements Screen {
         this.logger = new Logger("GameScreen");
         this.modelBatch = new ModelBatch();
         
+        // Initialize UI components for respawn message
+        this.font = new BitmapFont();
+        this.font.getData().setScale(2f); // Larger text
+        this.batch = new SpriteBatch();
+        
+        gameWorld = new GameWorld(logger);
+
+        spawnPosition = gameWorld.getSpawnPosition();
+        spawnPosition.y += 2.5f; 
+
         initializeWorld();
         
         logger.info("Game screen initialized");
@@ -42,11 +59,12 @@ public class GameScreen implements Screen {
      * Initializes the game world and player.
      */
     private void initializeWorld() {
-        gameWorld = new GameWorld(logger);
         
-        // Create player at spawn position
-        Vector3 spawnPosition = gameWorld.getSpawnPosition();
+
         player = new Player(spawnPosition, logger);
+        
+        // Initial camera update to focus on player
+        updateCamera();
         
         logger.info("World and player initialized at position: " + spawnPosition);
     }
@@ -58,21 +76,32 @@ public class GameScreen implements Screen {
     
     @Override
     public void render(float delta) {
-        // Clear the screen with deep space black
-        Gdx.gl.glClearColor(0.02f, 0.02f, 0.05f, 1);
+        // Clear the screen with a better visible color
+        Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+        
+        // Configure proper depth testing
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
+        Gdx.gl.glDepthFunc(GL20.GL_LEQUAL);
         
         // Disable face culling to ensure all faces are rendered
         Gdx.gl.glDisable(GL20.GL_CULL_FACE);
         
-        // Handle input
-        handleInput(delta);
+        // Only handle input if not respawning
+        if (!respawning) {
+            handleInput(delta);
+        }
         
         // Update game logic
         update(delta);
         
         // Render the world
         renderWorld();
+        
+        // Draw respawn message if respawning
+        if (respawning) {
+            renderRespawnMessage();
+        }
     }
     
     /**
@@ -142,19 +171,39 @@ public class GameScreen implements Screen {
         }
     }
     
+    // Flag to track respawn status
+    private boolean respawning = false;
+    private float respawnTimer = 0f;
+    private static final float RESPAWN_DELAY = 1.5f; // Delay before respawning
+    
     /**
      * Updates the game logic.
      * 
      * @param delta Time since the last frame
      */
     private void update(float delta) {
+        // Handle respawning sequence if active
+        if (respawning) {
+            respawnTimer += delta;
+            
+            // Wait for delay before actually respawning
+            if (respawnTimer >= RESPAWN_DELAY) {
+                completeRespawn();
+                respawning = false;
+                respawnTimer = 0f;
+            }
+            
+            // Skip the rest of the update while respawning
+            return;
+        }
+        
         // Update player
         player.update(delta);
         
         // Check if player has fallen off the map
         Vector3 playerPos = player.getPosition();
         if (playerPos.y < gameWorld.getDeathHeight()) {
-            respawnPlayer();
+            startRespawn();
             // Skip the rest of the update to ensure clean respawn
             return;
         }
@@ -167,23 +216,47 @@ public class GameScreen implements Screen {
     }
     
     /**
-     * Respawns the player at the spawn position.
-     * Handles complete player reset to avoid physics issues.
+     * Starts the respawn sequence.
+     * Freezes player input and prepares for teleportation.
      */
-    private void respawnPlayer() {
+    private void startRespawn() {
+        if (!respawning) {
+            respawning = true;
+            respawnTimer = 0f;
+            
+            // Freeze player in place
+            player.setVelocity(new Vector3(0, 0, 0));
+            player.setAnimationState(Player.AnimationState.INVISIBLE);
+            
+            // Set player to safe position to prevent continuing to fall
+            Vector3 safePosition = new Vector3(0, 100, 0); // High above the map
+            player.setPosition(safePosition);
+            
+            logger.info("Player death detected. Starting respawn sequence.");
+        }
+    }
+    
+    /**
+     * Completes the respawn process after delay.
+     * Places player at spawn point and resets state.
+     */
+    private void completeRespawn() {
         Vector3 spawnPosition = gameWorld.getSpawnPosition();
+        spawnPosition.y += 2.5f; // Elevate player on respawn
         
         // Reset the player's state completely
         player.setPosition(spawnPosition);
         player.resetVelocity();
         player.setAnimationState(Player.AnimationState.IDLE);
         
-        // Only log respawn once to avoid console spam
-        logger.info("Player respawned at: " + spawnPosition);
-        
-        // Update camera immediately to avoid view of the void
+        // Update camera immediately to follow respawned player
         updateCamera();
+        
+        logger.info("Player respawned at: " + spawnPosition);
     }
+    
+    // Keep a fixed camera height to prevent jarring during jumps
+    private float cameraFixedHeight = 100f;
     
     /**
      * Updates the camera to follow the player.
@@ -191,13 +264,22 @@ public class GameScreen implements Screen {
     private void updateCamera() {
         Vector3 playerPos = player.getPosition();
         
-        // Position camera further back to see more of the platform
+        // Position camera with fixed height and closer view
         game.getCamera().position.set(
-                playerPos.x + 70, // Larger offset for wider view
-                playerPos.y + 70, // Higher position for better overview
-                playerPos.z + 70  // Maintain isometric view
+            playerPos.x + 50, // Reduced offset for closer view
+            cameraFixedHeight, // Fixed height regardless of player's y position
+            playerPos.z + 50  // Reduced offset for closer view
         );
-        game.getCamera().lookAt(playerPos);
+        
+        // Always look at player's horizontal position but at a fixed height
+        // This prevents the camera from moving up and down during jumps
+        Vector3 lookTarget = new Vector3(
+            playerPos.x,
+            0, // Look at ground level for stability
+            playerPos.z
+        );
+        
+        game.getCamera().lookAt(lookTarget);
         game.getCamera().update();
     }
     
@@ -211,10 +293,10 @@ public class GameScreen implements Screen {
         
         modelBatch.begin(game.getCamera());
         
-        // Render world
+        // Render world first
         gameWorld.render(modelBatch, game.getEnvironment());
         
-        // Render player - explicitly ensure player is rendered
+        // Render player after world to ensure visibility
         if (player != null) {
             player.render(modelBatch, game.getEnvironment());
             logger.debug("Rendering player at position: " + player.getPosition());
@@ -245,11 +327,38 @@ public class GameScreen implements Screen {
         logger.info("Game screen hidden");
     }
     
+    /**
+     * Renders the respawn message when player is respawning.
+     */
+    private void renderRespawnMessage() {
+        batch.begin();
+        String message = "Respawning...";
+        
+        // Calculate time remaining as a percentage
+        float percentComplete = respawnTimer / RESPAWN_DELAY;
+        
+        // Draw progress bar
+        int barWidth = 200;
+        int barHeight = 20;
+        int x = Gdx.graphics.getWidth() / 2 - barWidth / 2;
+        int y = Gdx.graphics.getHeight() / 2 - 100;
+        
+        // Draw text
+        font.setColor(1, 1, 1, 1);
+        float textWidth = font.draw(batch, message, 
+                           x + barWidth / 2 - font.getData().scaleX * message.length() * 5, 
+                           y + 50).width;
+        
+        batch.end();
+    }
+    
     @Override
     public void dispose() {
         logger.info("Disposing game screen resources");
         modelBatch.dispose();
         gameWorld.dispose();
         player.dispose();
+        font.dispose();
+        batch.dispose();
     }
 }

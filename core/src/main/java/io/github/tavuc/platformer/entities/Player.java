@@ -31,7 +31,7 @@ public class Player {
     }
     
     private static final float MOVE_SPEED = 15f; // Faster movement for larger world
-    private static final float JUMP_FORCE = 30f; // Stronger jump for larger distances
+    private static final float JUMP_FORCE = 10f; // Reduced jump force to player height equivalent
     private static final float DASH_DISTANCE = 25f; // Longer dash (5 tiles as per requirements)
     
     // Movement control flags
@@ -40,7 +40,7 @@ public class Player {
     private boolean movingLeft = false;
     private boolean movingRight = false;
     private static final float DASH_COOLDOWN = 1.5f;
-    private static final float JUMP_COOLDOWN = 0.8f;
+    private static final float JUMP_COOLDOWN = 0.5f; // Reduced cooldown for less floaty feel
     
     private final Logger logger;
     private final Model model;
@@ -71,7 +71,7 @@ public class Player {
         this.position = position;
         this.logger = logger;
         this.velocity = new Vector3(0, 0, 0);
-        this.acceleration = new Vector3(0, -9.8f, 0); // Gravity
+        this.acceleration = new Vector3(0, -20f, 0); // Increased gravity for less floaty jumps
         
         this.currentState = AnimationState.IDLE;
         this.stateTime = 0;
@@ -84,15 +84,18 @@ public class Player {
         this.idleAnimTime = 0;
         this.bounceOffset = 0;
         
-        // Create player model (white cube)
+        // Create player model with original size
         ModelBuilder modelBuilder = new ModelBuilder();
         model = modelBuilder.createBox(
-            PlatformerGame.PLAYER_SIZE, 
+            PlatformerGame.PLAYER_SIZE, // Back to original size
             PlatformerGame.PLAYER_SIZE, 
             PlatformerGame.PLAYER_SIZE,
-            new Material(ColorAttribute.createDiffuse(Color.WHITE)),
+            new Material(ColorAttribute.createDiffuse(Color.WHITE)), // Back to original white color
             VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal
         );
+        
+        // Original material settings
+        model.materials.get(0).set(new ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.4f, 0.4f, 1f));
         
         // Disable face culling for the player model
         model.materials.get(0).set(new com.badlogic.gdx.graphics.g3d.attributes.IntAttribute(
@@ -371,12 +374,13 @@ public class Player {
     }
     
     /**
-     * Gets the player's current velocity.
+     * Sets the player's velocity directly.
+     * Used for immediate velocity changes like respawn.
      * 
-     * @return The player's velocity
+     * @param velocity The new velocity
      */
-    public Vector3 getVelocity() {
-        return velocity;
+    public void setVelocity(Vector3 velocity) {
+        this.velocity = velocity;
     }
     
     /**
@@ -393,5 +397,14 @@ public class Player {
      */
     public void dispose() {
         model.dispose();
+    }
+
+    /**
+     * Gets the player's current velocity.
+     * 
+     * @return The player's velocity
+     */
+    public Vector3 getVelocity() {
+        return velocity;
     }
 }

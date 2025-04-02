@@ -54,26 +54,37 @@ public class GameWorld implements Disposable {
     private void createModels() {
         ModelBuilder modelBuilder = new ModelBuilder();
         
-        // Create platform model - more 3D platform with better depth
+        // Create platform model - back to original color
         platformModel = modelBuilder.createBox(
             PlatformerGame.TILE_SIZE,
-            PlatformerGame.TILE_SIZE / 3, // Thicker platform for more 3D look
+            PlatformerGame.TILE_SIZE / 2, // Keep thicker platform for visibility
             PlatformerGame.TILE_SIZE,
-            new Material(ColorAttribute.createDiffuse(new Color(0.38f, 0.38f, 0.7f, 1f))), // Adjusted to match screenshot
+            new Material(ColorAttribute.createDiffuse(new Color(0.38f, 0.38f, 0.7f, 1f))), // Original color
             VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal
         );
         
-        // Create key shard model - small yellow sphere
+        // Keep some ambient light for visibility
+        platformModel.materials.get(0).set(new ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.4f, 0.6f, 1f));
+        
+        // Disable face culling for the platform model
+        platformModel.materials.get(0).set(new com.badlogic.gdx.graphics.g3d.attributes.IntAttribute(
+            com.badlogic.gdx.graphics.g3d.attributes.IntAttribute.CullFace, 
+            com.badlogic.gdx.graphics.GL20.GL_NONE));
+            
+        // Create key shard model - small gold sphere with enhanced lighting
         keyShardModel = modelBuilder.createSphere(
-            PlatformerGame.TILE_SIZE / 5, 
-            PlatformerGame.TILE_SIZE / 5, 
-            PlatformerGame.TILE_SIZE / 5, 
-            10, 10,
+            PlatformerGame.TILE_SIZE / 4, 
+            PlatformerGame.TILE_SIZE / 4, 
+            PlatformerGame.TILE_SIZE / 4, 
+            16, 16, // Higher resolution for smoother look
             new Material(ColorAttribute.createDiffuse(Color.GOLD)),
             VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal
         );
         
-        logger.info("World models created");
+        // Add ambient light to key shards
+        keyShardModel.materials.get(0).set(new ColorAttribute(ColorAttribute.AmbientLight, 0.8f, 0.7f, 0.2f, 1f));
+        
+        logger.info("World models created with enhanced visibility");
     }
     
     /**
@@ -81,22 +92,22 @@ public class GameWorld implements Disposable {
      */
     private void generateWorld() {
         // Create a much larger platform for movement testing
-        // Let's make it 30x larger than the player for plenty of space
-        float platformWidth = PlatformerGame.PLAYER_SIZE * 30;
-        float platformDepth = PlatformerGame.PLAYER_SIZE * 30;
+        // Let's make it even larger for good visibility
+        float platformWidth = PlatformerGame.PLAYER_SIZE * 40;  // Increased from 30
+        float platformDepth = PlatformerGame.PLAYER_SIZE * 40;  // Increased from 30
         
         // Convert to tile counts (how many tiles wide and deep)
         int tileWidth = (int)(platformWidth / PlatformerGame.TILE_SIZE);
         int tileDepth = (int)(platformDepth / PlatformerGame.TILE_SIZE);
         
-        // Create the platform
+        // Create the main platform
         createPlatform(0, 0, tileWidth, tileDepth);
         
-        // Add some key shards to test collection
-        addKeyShard(10, 2, 10);
-        addKeyShard(-10, 2, -10);
-        addKeyShard(10, 2, -10);
-        addKeyShard(-10, 2, 10);
+        // Add some key shards to test collection - spread them out more
+        addKeyShard(15, 2, 15);
+        addKeyShard(-15, 2, -15);
+        addKeyShard(15, 2, -15);
+        addKeyShard(-15, 2, 15);
         
         logger.info("World generated with a large platform of size " + tileWidth + "x" + tileDepth + " tiles");
     }
@@ -240,7 +251,7 @@ public class GameWorld implements Disposable {
             this.position = new Vector3(x, y, z);
             this.width = widthTiles * PlatformerGame.TILE_SIZE;
             this.depth = depthTiles * PlatformerGame.TILE_SIZE;
-            this.topY = y + (PlatformerGame.TILE_SIZE / 6); // Top of the platform (thicker)
+            this.topY = y + (PlatformerGame.TILE_SIZE / 4); // Top of the platform (half thickness)
             
             // Create model instance with proper scaling
             this.modelInstance = new ModelInstance(model);
@@ -297,8 +308,6 @@ public class GameWorld implements Disposable {
         public float getTopY() {
             return topY;
         }
-        
-  
     }
     
     /**
@@ -308,6 +317,8 @@ public class GameWorld implements Disposable {
         private final Vector3 position;
         private final ModelInstance modelInstance;
         private float rotationAngle;
+        private float bounceOffset;
+        private float bounceTime;
         
         /**
          * Creates a new key shard.
@@ -320,8 +331,9 @@ public class GameWorld implements Disposable {
         public KeyShard(float x, float y, float z, Model model) {
             this.position = new Vector3(x, y, z);
             this.modelInstance = new ModelInstance(model);
-            this.modelInstance.transform.setToTranslation(position);
             this.rotationAngle = 0;
+            this.bounceTime = 0;
+            this.bounceOffset = 0;
         }
         
         /**
@@ -331,7 +343,7 @@ public class GameWorld implements Disposable {
          * @return True if the key shard is colliding with the player
          */
         public boolean isCollidingWithPlayer(Vector3 playerPos) {
-            float collisionDistance = 1.5f; // Distance for collision
+            float collisionDistance = 2.0f; // Increased collision distance for easier pickup
             return position.dst(playerPos) < collisionDistance;
         }
         
@@ -351,11 +363,22 @@ public class GameWorld implements Disposable {
          * @param environment The lighting environment
          */
         public void render(ModelBatch modelBatch, Environment environment) {
-            // Update rotation animation
-            rotationAngle += 1f;
-            modelInstance.transform.setToTranslation(position);
+            // Update animation
+            rotationAngle += 1.5f; // Faster rotation
+            bounceTime += 0.05f;
+            bounceOffset = (float) Math.sin(bounceTime) * 0.3f; // Gentle hover animation
+            
+            // Set position with bounce offset
+            modelInstance.transform.setToTranslation(
+                position.x,
+                position.y + bounceOffset,
+                position.z
+            );
+            
+            // Apply rotation
             modelInstance.transform.rotate(0, 1, 0, rotationAngle);
             
+            // Render the key shard
             modelBatch.render(modelInstance, environment);
         }
     }

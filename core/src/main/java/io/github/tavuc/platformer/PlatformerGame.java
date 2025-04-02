@@ -47,18 +47,22 @@ public class PlatformerGame extends Game {
      */
     private void initCamera() {
         camera = new OrthographicCamera();
-        camera.setToOrtho(false, WORLD_WIDTH, WORLD_HEIGHT);
+        // Use a better-sized frustum for visibility
+        camera.setToOrtho(false, WORLD_WIDTH * 1.2f, WORLD_HEIGHT * 1.2f);
         
-        // Set isometric angle to match the screenshot exactly
-        camera.rotate(30, 1, 0, 0); // 30-degree elevation
+        // Set a lower camera angle for more side view
+        camera.rotate(15, 1, 0, 0); // Lowered to 15-degree elevation for more side view
         camera.rotate(45, 0, 1, 0); // 45-degree rotation
         
-        // Adjust zoom to better view the single platform
-        camera.zoom = 0.5f;
+        // Adjust zoom to focus more on the player and immediate surroundings
+        camera.zoom = 0.5f; // Decreased to 0.5f for a closer view
+        
+        // Set a larger far plane to prevent clipping
+        camera.far = 1000f;
         
         camera.update();
         
-        logger.info("Camera initialized with isometric perspective");
+        logger.info("Camera initialized with lower angle for side-view isometric perspective");
     }
     
     /**
@@ -66,8 +70,10 @@ public class PlatformerGame extends Game {
      */
     private void initEnvironment() {
         environment = new Environment();
-        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.4f, 0.5f, 1f));
-        environment.add(new DirectionalLight().set(0.8f, 0.8f, 0.8f, -1f, -0.8f, -0.2f));
+        // Increased ambient light for better visibility
+        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.6f, 1f));
+        // Made directional light brighter and adjusted direction
+        environment.add(new DirectionalLight().set(0.9f, 0.9f, 0.9f, -1f, -0.8f, -0.2f));
         
         logger.info("Environment and lighting initialized");
     }
@@ -78,8 +84,8 @@ public class PlatformerGame extends Game {
      */
     @Override
     public void render() {
-        // Set proper clear color and clear the screen
-        Gdx.gl.glClearColor(0.0f, 0.0f, 0.02f, 1); // Pure black for better contrast
+        // Set slightly lighter clear color for better contrast
+        Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1); // Slightly lighter than pure black
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         
         // Enable depth testing for proper 3D rendering
