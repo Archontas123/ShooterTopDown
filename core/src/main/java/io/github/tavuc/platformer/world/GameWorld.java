@@ -205,7 +205,8 @@ public class GameWorld implements Disposable {
      * @return The spawn position
      */
     public Vector3 getSpawnPosition() {
-        return spawnPosition;
+        // Return a new Vector3 to avoid reference modification
+        return new Vector3(spawnPosition);
     }
     
     /**

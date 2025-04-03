@@ -28,7 +28,6 @@ public class GameScreen implements Screen {
     // Add respawn UI elements
     private BitmapFont font;
     private SpriteBatch batch;
-    private Vector3 spawnPosition;
     
     /**
      * Creates a new game screen.
@@ -45,11 +44,6 @@ public class GameScreen implements Screen {
         this.font.getData().setScale(2f); // Larger text
         this.batch = new SpriteBatch();
         
-        gameWorld = new GameWorld(logger);
-
-        spawnPosition = gameWorld.getSpawnPosition();
-        spawnPosition.y += 2.5f; 
-
         initializeWorld();
         
         logger.info("Game screen initialized");
@@ -59,8 +53,11 @@ public class GameScreen implements Screen {
      * Initializes the game world and player.
      */
     private void initializeWorld() {
+        gameWorld = new GameWorld(logger);
         
-
+        // Create player at spawn position with slight elevation
+        Vector3 spawnPosition = gameWorld.getSpawnPosition();
+        spawnPosition.y += 2.5f; // Elevate the player a bit to ensure visibility
         player = new Player(spawnPosition, logger);
         
         // Initial camera update to focus on player
@@ -241,15 +238,16 @@ public class GameScreen implements Screen {
      * Places player at spawn point and resets state.
      */
     private void completeRespawn() {
-        Vector3 spawnPosition = gameWorld.getSpawnPosition();
+        // Get the original spawn position from the world
+        Vector3 spawnPosition = new Vector3(gameWorld.getSpawnPosition());
         spawnPosition.y += 2.5f; // Elevate player on respawn
         
-        // Reset the player's state completely
-        player.setPosition(spawnPosition);
+        // Force player back to spawn position
+        player.setPosition(new Vector3(spawnPosition));
         player.resetVelocity();
         player.setAnimationState(Player.AnimationState.IDLE);
         
-        // Update camera immediately to follow respawned player
+        // Force camera update to show correct position
         updateCamera();
         
         logger.info("Player respawned at: " + spawnPosition);
