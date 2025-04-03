@@ -26,7 +26,6 @@ public class GameWorld implements Disposable {
     private final Logger logger;
     private final Array<Platform> platforms;
     private final Array<KeyShard> keyShards;
-    private final Array<Wall> walls;
     private final Vector3 spawnPosition;
     
     private Model platformModel;
@@ -41,7 +40,6 @@ public class GameWorld implements Disposable {
         this.logger = logger;
         this.platforms = new Array<>();
         this.keyShards = new Array<>();
-        this.walls = new Array<>();
         this.spawnPosition = new Vector3(0, 5, 0);
         
         createModels();
@@ -56,7 +54,6 @@ public class GameWorld implements Disposable {
     private void createModels() {
         ModelBuilder modelBuilder = new ModelBuilder();
         
-        // Create platform model
         platformModel = modelBuilder.createBox(
             PlatformerGame.TILE_SIZE,
             PlatformerGame.TILE_SIZE / 2, 
@@ -86,7 +83,7 @@ public class GameWorld implements Disposable {
     }
     
     /**
-     * Generates the initial world layout. (Currently set to a test layout eventually will be procedural)
+     * Generates the initial world layout.
      */
     private void generateWorld() {
         float platformWidth = PlatformerGame.PLAYER_SIZE * 40;
@@ -95,50 +92,13 @@ public class GameWorld implements Disposable {
         int tileWidth = (int)(platformWidth / PlatformerGame.TILE_SIZE);
         int tileDepth = (int)(platformDepth / PlatformerGame.TILE_SIZE);
         
-        createPlatform(0, 0,0, tileWidth, tileDepth);
-        createPlatform(0, 10,0, tileWidth/2, tileDepth/2);
+        createPlatform(0, 0, 0, tileWidth, tileDepth);
+        createPlatform(0, 10, 0, tileWidth/2, tileDepth/2);
 
-        
         float platformY = 20f; 
-        int wallPlatformWidth = 20;
-        int wallPlatformDepth = 20;
+     
         
-        
-        float wallHeight = 25f;
-        float wallWidth = 1f;
-        
-        createWall(
-            -20f, 
-            platformY / 2, 
-            0,
-            wallWidth,
-            wallHeight,
-            wallPlatformDepth
-        );
-        
-
-        createWall(
-            0,
-            platformY / 2,
-            -20f, 
-            wallPlatformWidth,
-            wallHeight,
-            wallWidth
-        );
-        
-    
-        createWall(
-            -15f,
-            platformY / 2,
-            -15f,
-            10f,
-            wallHeight,
-            wallWidth
-        );
-        
-
-        
-        
+      
         logger.info("World generated");
     }
     
@@ -151,40 +111,12 @@ public class GameWorld implements Disposable {
      * @param width Width in tiles
      * @param depth Depth in tiles
      */
-    private void createPlatform(float x, float y,float z, int width, int depth) {
+    private void createPlatform(float x, float y, float z, int width, int depth) {
         Platform platform = new Platform(x, y, z, width, depth, platformModel);
         platforms.add(platform);
     }
     
-    /**
-     * Creates a vertical wall with the specified dimensions.
-     *
-     * @param x X position (center)
-     * @param y Y position (center)
-     * @param z Z position (center)
-     * @param width Width in tiles
-     * @param height Height in tiles
-     * @param depth Depth in tiles
-     */
-    private void createWall(float x, float y, float z, float width, float height, float depth) {
-        ModelBuilder modelBuilder = new ModelBuilder();
-        Model wallModel = modelBuilder.createBox(
-            width * PlatformerGame.TILE_SIZE,
-            height * PlatformerGame.TILE_SIZE,
-            depth * PlatformerGame.TILE_SIZE,
-            new Material(ColorAttribute.createDiffuse(new Color(0.6f, 0.4f, 0.2f, 1f))), 
-            VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal
-        );
-        
-        wallModel.materials.get(0).set(new ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.3f, 0.2f, 1f));
-        
-        Wall wall = new Wall(x, y, z, width, height, depth, wallModel);
-        walls.add(wall);
-        
-        logger.info("Created wall at position: (" + x + ", " + y + ", " + z + ") with dimensions: " + 
-                width + "x" + height + "x" + depth);
-    }
-    
+  
     /**
      * Adds a key shard at the specified position.
      * 
@@ -237,100 +169,10 @@ public class GameWorld implements Disposable {
             }
         }
         
-        // Check wall collisions for wall-sliding and running mechanics
-        boolean againstWall = false;
-        Wall collidingWall = null;
-        int wallDirection = 0; // 0 = none, 1 = left, 2 = right, 3 = front, 4 = back
+    
+ 
         
-        // Check if player is in the air (jumping) before checking for wall sliding
-        boolean isInAir = player.getCurrentState() == Player.AnimationState.JUMPING || 
-                         player.getCurrentState() == Player.AnimationState.WALL_SLIDING ||
-                         player.getCurrentState() == Player.AnimationState.WALL_RUNNING;
-                          
-        if (isInAir) {
-            for (Wall wall : walls) {
-                int direction = wall.isPlayerAgainstWall(playerPos, player.getVelocity());
-                if (direction > 0) {
-                    againstWall = true;
-                    collidingWall = wall;
-                    wallDirection = direction;
-                    
-                    // If already wall sliding or running, maintain position relative to wall
-                    if (player.getCurrentState() == Player.AnimationState.WALL_SLIDING || 
-                        player.getCurrentState() == Player.AnimationState.WALL_RUNNING) {
-                        // Push player slightly against the wall to ensure contact
-                        Vector3 stickToWallPos = new Vector3(playerPos);
-                        
-                        // Slightly adjust position based on wall direction to ensure contact
-                        switch (direction) {
-                            case 1: // Left wall
-                                stickToWallPos.x = (collidingWall.getPosition().x - collidingWall.getHalfWidth()) - (PlatformerGame.PLAYER_SIZE / 2) - 0.1f;
-                                break;
-                            case 2: // Right wall
-                                stickToWallPos.x = (collidingWall.getPosition().x + collidingWall.getHalfWidth()) + (PlatformerGame.PLAYER_SIZE / 2) + 0.1f;
-                                break;
-                            case 3: // Front wall
-                                stickToWallPos.z = (collidingWall.getPosition().z - collidingWall.getHalfDepth()) - (PlatformerGame.PLAYER_SIZE / 2) - 0.1f;
-                                break;
-                            case 4: // Back wall
-                                stickToWallPos.z = (collidingWall.getPosition().z + collidingWall.getHalfDepth()) + (PlatformerGame.PLAYER_SIZE / 2) + 0.1f;
-                                break;
-                        }
-                        
-                        // Only adjust the relevant coordinate to maintain the rest of the position
-                        if (direction == 1 || direction == 2) {
-                            playerPos.x = stickToWallPos.x;
-                        } else {
-                            playerPos.z = stickToWallPos.z;
-                        }
-                        player.setPosition(playerPos);
-                    }
-                    // If velocity is downward, start wall sliding
-                    else if (player.getVelocity().y < 0) {
-                        player.setAnimationState(Player.AnimationState.WALL_SLIDING);
-                        logger.debug("Player started wall sliding on wall direction: " + wallDirection);
-                    }
-                    break;
-                }
-            }
-        }
-        
-        // Update player's wall state for wall sliding and running
-        player.setAgainstWall(againstWall, wallDirection, collidingWall != null ? collidingWall.getNormal() : null);
-        
-        // Check for wall penetration and push player out of walls
-        // Skip penetration checks if player is wall sliding or wall running
-        // This prevents interference with those mechanics
-        if (!player.isWallRunning() && 
-            player.getCurrentState() != Player.AnimationState.WALL_SLIDING) {
-            
-            for (Wall wall : walls) {
-                int penetrationDirection = wall.isPlayerPenetratingWall(playerPos);
-                if (penetrationDirection > 0) {
-                    // Get the correction vector to move player out of wall
-                    Vector3 correction = wall.getCollisionCorrection(playerPos, penetrationDirection);
-                    if (correction != null) {
-                        // Apply correction to player position
-                        playerPos.add(correction);
-                        player.setPosition(playerPos);
-                        
-                        // Zero out velocity in the direction of collision
-                        Vector3 velocity = player.getVelocity();
-                        if (penetrationDirection == 1 || penetrationDirection == 2) {
-                            velocity.x = 0; // Zero out X velocity for left/right collisions
-                        } else if (penetrationDirection == 3 || penetrationDirection == 4) {
-                            velocity.z = 0; // Zero out Z velocity for front/back collisions
-                        }
-                        
-                        logger.debug("Prevented wall penetration, corrected position: " + playerPos);
-                    }
-                    break;
-                }
-            }
-        }
-        
-        if (!onPlatform && player.getCurrentState() != Player.AnimationState.JUMPING 
-                && player.getCurrentState() != Player.AnimationState.WALL_SLIDING) {
+        if (!onPlatform && player.getCurrentState() != Player.AnimationState.JUMPING) {
             player.setAnimationState(Player.AnimationState.JUMPING);
         }
         
@@ -344,6 +186,7 @@ public class GameWorld implements Disposable {
         
         keyShards.removeAll(shardsToRemove, true);
     }
+    
     /**
      * Moves the player after the side collision
      * 
@@ -389,9 +232,7 @@ public class GameWorld implements Disposable {
             platform.render(modelBatch, environment);
         }
         
-        for (Wall wall : walls) {
-            wall.render(modelBatch, environment);
-        }
+
         
         for (KeyShard shard : keyShards) {
             shard.render(modelBatch, environment);
@@ -424,11 +265,8 @@ public class GameWorld implements Disposable {
         platformModel.dispose();
         keyShardModel.dispose();
         
-        for (Wall wall : walls) {
-            wall.disposeModel();
-        }
+
         
         logger.info("Game world disposed");
     }
-    
 }
