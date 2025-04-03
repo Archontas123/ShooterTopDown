@@ -16,19 +16,16 @@ public class EffectsManager implements Disposable {
     private final Logger logger;
     private final ParticleEffect particleEffect;
     
-    // Colors for different effect types
     private static final Color WALK_DUST_COLOR = new Color(0.7f, 0.7f, 0.65f, 1.0f);
     private static final Color DASH_TRAIL_COLOR = new Color(0.2f, 0.6f, 1.0f, 1.0f);
     private static final Color WALL_SLIDE_COLOR = new Color(0.8f, 0.8f, 0.8f, 1.0f);
-    private static final Color WALL_RUN_COLOR = new Color(0.9f, 0.6f, 0.3f, 1.0f); // Orange-ish for wall run
+    private static final Color WALL_RUN_COLOR = new Color(0.9f, 0.6f, 0.3f, 1.0f); 
     
-    // Timers for effect spawning
     private float walkEffectTimer = 0f;
-    private static final float WALK_EFFECT_INTERVAL = 0.3f; // Spawn dust every 0.3 seconds while walking
+    private static final float WALK_EFFECT_INTERVAL = 0.3f; 
     
-    // Previous position for trail effects
     private final Vector3 previousPosition = new Vector3();
-    private final Vector3 tempVector = new Vector3(); // Used for calculations
+    private final Vector3 tempVector = new Vector3(); 
     
     /**
      * Creates a new effects manager.
@@ -49,7 +46,6 @@ public class EffectsManager implements Disposable {
     public void update(float delta) {
         particleEffect.update(delta);
         
-        // Update timers
         if (walkEffectTimer > 0) {
             walkEffectTimer -= delta;
         }
@@ -77,7 +73,6 @@ public class EffectsManager implements Disposable {
         }
         
         if (walkEffectTimer <= 0) {
-            // Slightly modify the position to spawn at ground level
             tempVector.set(position.x, position.y - 0.5f, position.z);
             particleEffect.createDustEffect(tempVector, WALK_DUST_COLOR, 3);
             walkEffectTimer = WALK_EFFECT_INTERVAL;
@@ -91,28 +86,23 @@ public class EffectsManager implements Disposable {
      * @param isDashing Whether the player is currently dashing
      */
     public void createDashTrailEffect(Vector3 currentPosition, boolean isDashing) {
-        // Only create trail if dashing
         if (!isDashing) {
-            // If not dashing, just update the previous position
             previousPosition.set(currentPosition);
             return;
         }
         
-        // If positions are the same or too close, don't create a trail
         if (previousPosition.dst2(currentPosition) < 0.5f) {
             previousPosition.set(currentPosition);
             return;
         }
         
-        // Create trail from previous to current position
         particleEffect.createTrailEffect(
             previousPosition,
             currentPosition,
             DASH_TRAIL_COLOR,
-            10 // Number of particles in the trail
+            10 
         );
         
-        // Update previous position
         previousPosition.set(currentPosition);
     }
     
@@ -123,18 +113,13 @@ public class EffectsManager implements Disposable {
      * @param wallNormal The normal vector of the wall
      */
     public void createWallSlideEffect(Vector3 position, Vector3 wallNormal) {
-        // Create small dust particles that appear to slide along the wall
         tempVector.set(position);
         
-        // Create particles that move slightly downward and outward from the wall
-        for (int i = 0; i < 2; i++) { // Create just a few particles for subtle effect
-            // Slightly randomize position
+        for (int i = 0; i < 2; i++) { 
             float offsetY = -0.1f + (float)Math.random() * 0.2f;
             
-            // Set particle position
             tempVector.set(position).add(0, offsetY, 0);
             
-            // Create particles that move perpendicular to the wall (along normal)
             particleEffect.createDustEffect(tempVector, WALL_SLIDE_COLOR, 1);
         }
     }
@@ -147,27 +132,21 @@ public class EffectsManager implements Disposable {
      * @param forwardSpeed The player's forward speed
      */
     public void createWallRunEffect(Vector3 position, Vector3 wallNormal, float forwardSpeed) {
-        // Make streak particles along the wall in the direction of movement
         tempVector.set(position);
         
-        // Direction of the streak (based on player's forward/backward movement)
         float direction = Math.signum(forwardSpeed);
         
-        // Create more elongated particles for a speed effect
         for (int i = 0; i < 3; i++) {
-            // Randomize position slightly
             float offsetY = -0.3f + (float)Math.random() * 0.6f;
             float offsetZ = direction * ((float)Math.random() * 0.5f);
             
-            // Set particle position
             tempVector.set(position).add(0, offsetY, offsetZ);
             
-            // Create streak particles
             particleEffect.createStretchedEffect(
                 tempVector,
-                new Vector3(0, 0, direction), // Direction of stretch (forward/backward)
+                new Vector3(0, 0, direction), 
                 WALL_RUN_COLOR,
-                0.8f + (float)Math.random() * 0.4f // Random lifetime
+                0.8f + (float)Math.random() * 0.4f 
             );
         }
     }
@@ -204,19 +183,16 @@ public class EffectsManager implements Disposable {
         int count = jumpingUp ? 12 : 15;
         
         for (int i = 0; i < count; i++) {
-            // Create a position slightly offset from the player
             Vector3 effectPos = new Vector3(position);
             
-            // Add a small random offset in a circle
             float angle = MathUtils.random(360) * MathUtils.degreesToRadians;
             float radius = MathUtils.random(0.2f, 0.5f);
             effectPos.add(
                 MathUtils.cos(angle) * radius,
-                jumpingUp ? -0.5f : -0.8f, // Lower for landing effect
+                jumpingUp ? -0.5f : -0.8f,
                 MathUtils.sin(angle) * radius
             );
             
-            // Create dust particles with appropriate velocity based on jump type
             particleEffect.createDustEffect(effectPos, color, 1);
         }
         

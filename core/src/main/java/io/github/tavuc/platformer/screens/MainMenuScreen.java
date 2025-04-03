@@ -42,14 +42,11 @@ public class MainMenuScreen implements Screen {
         this.font = new BitmapFont();
         this.font.getData().setScale(2f);
         
-        // Create a simple skin for UI elements
         this.skin = new Skin(Gdx.files.internal("ui/uiskin.json"));
         if (!Gdx.files.internal("uiskin.json").exists()) {
-            // If skin doesn't exist, create a basic skin
             createBasicSkin();
         }
         
-        // Create stage and set it as input processor
         this.stage = new Stage(new FitViewport(
                 PlatformerGame.WORLD_WIDTH, 
                 PlatformerGame.WORLD_HEIGHT));
@@ -64,7 +61,6 @@ public class MainMenuScreen implements Screen {
      * Creates a basic skin for UI elements if the default skin is not available.
      */
     private void createBasicSkin() {
-        // Create a basic skin for UI elements
         TextButton.TextButtonStyle textButtonStyle = new TextButton.TextButtonStyle();
         textButtonStyle.font = font;
         textButtonStyle.fontColor = Color.WHITE;
@@ -137,7 +133,7 @@ public class MainMenuScreen implements Screen {
     
     @Override
     public void render(float delta) {
-        Gdx.gl.glClearColor(0.05f, 0.05f, 0.1f, 1); // Dark space-like background
+        Gdx.gl.glClearColor(0.05f, 0.05f, 0.1f, 1); 
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         
         stage.act(delta);

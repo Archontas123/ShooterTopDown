@@ -73,26 +73,21 @@ public class ParticleEffect implements Disposable {
                 return false;
             }
             
-            // Update position based on velocity
             position.add(
                 velocity.x * delta,
                 velocity.y * delta,
                 velocity.z * delta
             );
             
-            // Update rotation
             rotation += rotationSpeed * delta;
             
-            // Update alpha for fade out
             alpha = 1.0f - (timeAlive / lifetime);
             
-            // Update the transform
             Matrix4 transform = modelInstance.transform;
             transform.setToTranslation(position);
             transform.rotate(0, 1, 0, rotation);
             transform.scale(scale.x, scale.y, scale.z);
             
-            // Update material alpha
             Material material = modelInstance.materials.get(0);
             BlendingAttribute blendAttr = (BlendingAttribute) material.get(BlendingAttribute.Type);
             if (blendAttr != null) {
@@ -103,7 +98,6 @@ public class ParticleEffect implements Disposable {
         }
     }
     
-    // Particle pool for efficient memory management
     private final Pool<Particle> particlePool = new Pool<Particle>() {
         @Override
         protected Particle newObject() {
@@ -118,7 +112,6 @@ public class ParticleEffect implements Disposable {
      * Creates a new particle effect system.
      */
     public ParticleEffect() {
-        // Create a simple cube model for the particles
         ModelBuilder modelBuilder = new ModelBuilder();
         particleModel = modelBuilder.createBox(
             1f, 1f, 1f,
@@ -142,42 +135,33 @@ public class ParticleEffect implements Disposable {
             Particle particle = particlePool.obtain();
             particle.modelInstance = new ModelInstance(particleModel);
             
-            // Clone the position vector to avoid reference issues
             particle.position.set(position);
             
-            // Add a small random offset
             particle.position.add(
                 MathUtils.random(-0.5f, 0.5f),
                 MathUtils.random(0.0f, 0.2f),
                 MathUtils.random(-0.5f, 0.5f)
             );
             
-            // Set a small upward and outward velocity
             particle.velocity.set(
                 MathUtils.random(-1.0f, 1.0f),
                 MathUtils.random(0.5f, 1.5f),
                 MathUtils.random(-1.0f, 1.0f)
             );
             
-            // Set a random scale (small)
             float scale = MathUtils.random(0.1f, 0.3f);
             particle.scale.set(scale, scale, scale);
             
-            // Set a random rotation and rotation speed
             particle.rotation = MathUtils.random(0, 360);
             particle.rotationSpeed = MathUtils.random(-90, 90);
             
-            // Set a random lifetime
             particle.lifetime = MathUtils.random(0.5f, 1.0f);
             
-            // Set the color
             Material material = particle.modelInstance.materials.get(0);
             material.set(ColorAttribute.createDiffuse(color));
             
-            // Activate the particle
             particle.isActive = true;
             
-            // Add to active particles
             activeParticles.add(particle);
         }
     }
@@ -195,49 +179,38 @@ public class ParticleEffect implements Disposable {
         Particle particle = particlePool.obtain();
         particle.modelInstance = new ModelInstance(particleModel);
         
-        // Clone the position vector to avoid reference issues
         particle.position.set(position);
         
-        // Set velocity to move slightly in the direction of the stretch
         particle.velocity.set(
             direction.x * MathUtils.random(0.5f, 1.5f),
             MathUtils.random(0.2f, 0.5f), // Always some upward drift
             direction.z * MathUtils.random(0.5f, 1.5f)
         );
         
-        // Set stretched scale - longer in the direction of movement
         float baseScale = MathUtils.random(0.15f, 0.3f);
-        float stretchFactor = 3.0f; // How much to stretch
+        float stretchFactor = 3.0f; 
         
         if (Math.abs(direction.z) > Math.abs(direction.x)) {
-            // Stretching in Z direction
             particle.scale.set(baseScale, baseScale, baseScale * stretchFactor);
         } else {
-            // Stretching in X direction
             particle.scale.set(baseScale * stretchFactor, baseScale, baseScale);
         }
         
-        // Set rotation to match direction
         if (direction.z != 0) {
             particle.rotation = direction.z > 0 ? 0 : 180;
         } else if (direction.x != 0) {
             particle.rotation = direction.x > 0 ? 90 : 270;
         }
         
-        // Minimal rotation speed for stretched particles
         particle.rotationSpeed = MathUtils.random(-20, 20);
         
-        // Set lifetime
         particle.lifetime = lifetime;
         
-        // Set the color
         Material material = particle.modelInstance.materials.get(0);
         material.set(ColorAttribute.createDiffuse(color));
         
-        // Activate the particle
         particle.isActive = true;
         
-        // Add to active particles
         activeParticles.add(particle);
     }
     
@@ -258,47 +231,37 @@ public class ParticleEffect implements Disposable {
             Particle particle = particlePool.obtain();
             particle.modelInstance = new ModelInstance(particleModel);
             
-            // Position along the line
             float t = i / (float) count;
             particle.position.set(start).mulAdd(direction, t * length);
             
-            // Add a small random offset perpendicular to the direction
             Vector3 perpendicular = new Vector3(
                 MathUtils.random(-0.5f, 0.5f),
                 MathUtils.random(-0.5f, 0.5f),
                 MathUtils.random(-0.5f, 0.5f)
             );
-            // Make sure perpendicular is actually perpendicular
             perpendicular.sub(direction.scl(perpendicular.dot(direction)));
             perpendicular.nor().scl(MathUtils.random(0.1f, 0.3f));
             particle.position.add(perpendicular);
             
-            // Set a small random velocity
             particle.velocity.set(
                 perpendicular.x * 0.5f,
                 MathUtils.random(0.1f, 0.5f),
                 perpendicular.z * 0.5f
             );
             
-            // Set a random scale (small)
             float scale = MathUtils.random(0.2f, 0.4f);
             particle.scale.set(scale, scale, scale);
             
-            // Set a random rotation and rotation speed
             particle.rotation = MathUtils.random(0, 360);
             particle.rotationSpeed = MathUtils.random(-45, 45);
             
-            // Set a random lifetime
             particle.lifetime = MathUtils.random(0.3f, 0.7f);
             
-            // Set the color
             Material material = particle.modelInstance.materials.get(0);
             material.set(ColorAttribute.createDiffuse(color));
             
-            // Activate the particle
             particle.isActive = true;
             
-            // Add to active particles
             activeParticles.add(particle);
         }
     }
@@ -317,10 +280,8 @@ public class ParticleEffect implements Disposable {
             Particle particle = particlePool.obtain();
             particle.modelInstance = new ModelInstance(particleModel);
             
-            // Clone the position vector to avoid reference issues
             particle.position.set(position);
             
-            // Add a small random offset in a circle
             float angle = MathUtils.random(360) * MathUtils.degreesToRadians;
             float radius = MathUtils.random(0.2f, 0.5f);
             particle.position.add(
@@ -329,16 +290,13 @@ public class ParticleEffect implements Disposable {
                 MathUtils.sin(angle) * radius
             );
             
-            // Set velocity based on whether jumping up or landing
             if (up) {
-                // For jump-up, particles mostly go upward
                 particle.velocity.set(
                     MathUtils.cos(angle) * MathUtils.random(0.5f, 1.0f),
                     MathUtils.random(2.0f, 3.0f),
                     MathUtils.sin(angle) * MathUtils.random(0.5f, 1.0f)
                 );
             } else {
-                // For landing, particles go outward in a circle
                 particle.velocity.set(
                     MathUtils.cos(angle) * MathUtils.random(1.0f, 2.0f),
                     MathUtils.random(0.5f, 1.5f),
@@ -346,25 +304,19 @@ public class ParticleEffect implements Disposable {
                 );
             }
             
-            // Set a random scale
             float scale = MathUtils.random(0.15f, 0.35f);
             particle.scale.set(scale, scale, scale);
             
-            // Set a random rotation and rotation speed
             particle.rotation = MathUtils.random(0, 360);
             particle.rotationSpeed = MathUtils.random(-60, 60);
             
-            // Set a random lifetime
             particle.lifetime = MathUtils.random(0.5f, 1.2f);
             
-            // Set the color
             Material material = particle.modelInstance.materials.get(0);
             material.set(ColorAttribute.createDiffuse(color));
             
-            // Activate the particle
             particle.isActive = true;
             
-            // Add to active particles
             activeParticles.add(particle);
         }
     }
@@ -375,7 +327,6 @@ public class ParticleEffect implements Disposable {
      * @param delta The time in seconds since the last update
      */
     public void update(float delta) {
-        // Iterate through active particles backwards to safely remove
         for (int i = activeParticles.size - 1; i >= 0; i--) {
             Particle particle = activeParticles.get(i);
             boolean stillActive = particle.update(delta);
@@ -410,7 +361,6 @@ public class ParticleEffect implements Disposable {
             particleModel.dispose();
         }
         
-        // Clear all active particles
         for (Particle particle : activeParticles) {
             particlePool.free(particle);
         }

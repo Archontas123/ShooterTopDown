@@ -19,7 +19,7 @@ public class PlatformerGame extends Game {
     public static final float WORLD_WIDTH = 800f;
     public static final float WORLD_HEIGHT = 450f;
     public static final float TILE_SIZE = 5f;
-    public static final float PLAYER_SIZE = TILE_SIZE * 0.8f; // Player is smaller than a single tile
+    public static final float PLAYER_SIZE = TILE_SIZE * 0.8f; 
     
     private OrthographicCamera camera;
     private Environment environment;
@@ -47,17 +47,13 @@ public class PlatformerGame extends Game {
      */
     private void initCamera() {
         camera = new OrthographicCamera();
-        // Use a better-sized frustum for visibility
         camera.setToOrtho(false, WORLD_WIDTH * 1.2f, WORLD_HEIGHT * 1.2f);
         
-        // Set a lower camera angle for more side view
-        camera.rotate(15, 1, 0, 0); // Lowered to 15-degree elevation for more side view
-        camera.rotate(45, 0, 1, 0); // 45-degree rotation
+        camera.rotate(15, 1, 0, 0); 
+        camera.rotate(45, 0, 1, 0); 
         
-        // Adjust zoom to focus more on the player and immediate surroundings
-        camera.zoom = 0.5f; // Decreased to 0.5f for a closer view
+        camera.zoom = 0.5f; 
         
-        // Set a larger far plane to prevent clipping
         camera.far = 1000f;
         
         camera.update();
@@ -70,9 +66,7 @@ public class PlatformerGame extends Game {
      */
     private void initEnvironment() {
         environment = new Environment();
-        // Increased ambient light for better visibility
         environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.6f, 1f));
-        // Made directional light brighter and adjusted direction
         environment.add(new DirectionalLight().set(0.9f, 0.9f, 0.9f, -1f, -0.8f, -0.2f));
         
         logger.info("Environment and lighting initialized");
@@ -84,14 +78,11 @@ public class PlatformerGame extends Game {
      */
     @Override
     public void render() {
-        // Set slightly lighter clear color for better contrast
-        Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1); // Slightly lighter than pure black
+        Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1); 
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         
-        // Enable depth testing for proper 3D rendering
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
         
-        // Disable face culling to ensure all model faces are rendered
         Gdx.gl.glDisable(GL20.GL_CULL_FACE);
         
         super.render();

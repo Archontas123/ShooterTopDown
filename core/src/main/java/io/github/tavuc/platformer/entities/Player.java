@@ -30,7 +30,7 @@ public class Player {
         ATTACKING, 
         INVISIBLE,
         WALL_SLIDING,
-        WALL_RUNNING  // New state for wall running
+        WALL_RUNNING  // State for wall running
     }
     
     private static final float MOVE_SPEED = 15f; // Faster movement for larger world
@@ -169,35 +169,58 @@ public class Player {
         // Apply physics if not dashing
         if (!isDashing) {
             // Check for wall running conditions
-            if (isAgainstWall && !isGrounded && 
-                (wallDirection == 1 || wallDirection == 2) && Math.abs(velocity.z) > 2.0f) {
-                
-                // Start wall running if player is moving forward/backward against a side wall
-                if (!isWallRunning) {
-                    isWallRunning = true;
-                    wallRunTimer = WALL_RUN_DURATION;
+            if (isAgainstWall && !isGrounded) {
+                if (currentState == AnimationState.WALL_SLIDING) {
+                    // When wall sliding, reduce falling speed
+                    velocity.y = WALL_SLIDE_SPEED;
                     
-                    // Set wall run direction based on which wall we're on
-                    wallRunDirection = (wallDirection == 1) ? -1 : 1;
+                    // Zero out horizontal velocity in wall normal direction to prevent 
+                    // drifting away from the wall
+                    if (wallDirection == 1 || wallDirection == 2) { // Left/right walls
+                        velocity.x = 0;
+                    } else if (wallDirection == 3 || wallDirection == 4) { // Front/back walls
+                        velocity.z = 0;
+                    }
                     
-                    setAnimationState(AnimationState.WALL_RUNNING);
-                    logger.info("Player started wall running on wall: " + wallDirection);
+                    // If player is moving (pressing any movement key), transition to wall running
+                    if (movingUp || movingDown) {
+                        isWallRunning = true;
+                        wallRunTimer = WALL_RUN_DURATION;
+                        
+                        // Set wall run direction based on which wall we're on
+                        wallRunDirection = (wallDirection == 1) ? -1 : 1;
+                        
+                        setAnimationState(AnimationState.WALL_RUNNING);
+                        logger.info("Player started wall running on wall: " + wallDirection);
+                    }
                 }
-                
                 // Apply wall running physics
-                if (isWallRunning) {
-                    // Reduced gravity
-                    velocity.y = WALL_RUN_GRAVITY;
+                else if (currentState == AnimationState.WALL_RUNNING) {
+                    // Stop vertical movement completely while wall running
+                    velocity.y = 0;
                     
-                    // Move forward along the wall
+                    // Zero out horizontal velocity in wall normal direction
+                    if (wallDirection == 1 || wallDirection == 2) { // Left/right walls
+                        velocity.x = 0;
+                    } else if (wallDirection == 3 || wallDirection == 4) { // Front/back walls
+                        velocity.z = 0;
+                    }
+                    
+                    // Move forward/backward along the wall
                     if (movingUp) {
                         velocity.z = -WALL_RUN_SPEED;
                     } else if (movingDown) {
                         velocity.z = WALL_RUN_SPEED;
+                    } else {
+                        velocity.z *= 0.9f; // Slow down if no input
+                        
+                        // If no forward/backward movement keys pressed, transition back to wall sliding
+                        if (Math.abs(velocity.z) < 2.0f) {
+                            isWallRunning = false;
+                            setAnimationState(AnimationState.WALL_SLIDING);
+                            logger.info("Player returned to wall sliding");
+                        }
                     }
-                    
-                    // Enforce wall contact (keep player against wall)
-                    velocity.x = 0;
                     
                     // Decrease wall run timer
                     wallRunTimer -= delta;
@@ -210,17 +233,8 @@ public class Player {
                 // End wall running if no longer against wall
                 isWallRunning = false;
                 setAnimationState(AnimationState.JUMPING);
-            }
-            // Wall sliding physics
-            else if (isAgainstWall && !isGrounded && velocity.y < 0 && !isWallRunning) {
-                // When sliding on wall, reduce falling speed
-                velocity.y = WALL_SLIDE_SPEED;
-                
-                if (currentState != AnimationState.WALL_SLIDING) {
-                    setAnimationState(AnimationState.WALL_SLIDING);
-                }
             } else {
-                // Apply acceleration to velocity (normal physics)
+                // Apply normal acceleration (gravity) to velocity
                 velocity.add(
                     acceleration.x * delta,
                     acceleration.y * delta,
@@ -296,6 +310,8 @@ public class Player {
         // Update grounded state for next frame
         wasGrounded = isGrounded;
     }
+
+    
     
     /**
      * Updates the player's animation based on current state.
@@ -387,15 +403,13 @@ public class Player {
      * Also handles wall jumping when against a wall.
      */
     public void jump() {
-        // Handle wall jump if against a wall and wall sliding
-        if (isAgainstWall && currentState == AnimationState.WALL_SLIDING && jumpCooldown <= 0) {
+        // Handle wall jump if against a wall and wall sliding or running
+        if (isAgainstWall && 
+            (currentState == AnimationState.WALL_SLIDING || 
+             currentState == AnimationState.WALL_RUNNING) && 
+            jumpCooldown <= 0) {
+            
             wallJump();
-            return;
-        }
-        
-        // Handle wall run jump if wall running
-        if (isWallRunning && jumpCooldown <= 0) {
-            wallRunJump();
             return;
         }
         
@@ -413,19 +427,31 @@ public class Player {
      * Makes the player perform a wall jump if against a wall.
      */
     public void wallJump() {
-        if (isAgainstWall && currentState == AnimationState.WALL_SLIDING && jumpCooldown <= 0) {
+        // Allow wall jumping if wall sliding OR wall running
+        if (isAgainstWall && 
+            (currentState == AnimationState.WALL_SLIDING || 
+             currentState == AnimationState.WALL_RUNNING) && 
+            jumpCooldown <= 0) {
+            
             // Calculate jump direction (away from wall)
             Vector3 jumpDirection = new Vector3(wallNormal);
             
-            // Apply horizontal force away from the wall
-            velocity.x = jumpDirection.x * WALL_JUMP_HORIZONTAL_FORCE;
-            velocity.z = jumpDirection.z * WALL_JUMP_HORIZONTAL_FORCE;
+            // Apply stronger horizontal force away from the wall
+            velocity.x = jumpDirection.x * WALL_JUMP_HORIZONTAL_FORCE * 1.2f;
             
-            // Apply vertical force upward
-            velocity.y = WALL_JUMP_VERTICAL_FORCE;
+            // Keep some Z momentum from wall running
+            if (currentState == AnimationState.WALL_RUNNING) {
+                velocity.z = velocity.z * 0.7f; // Preserve some forward momentum
+            } else {
+                velocity.z = jumpDirection.z * WALL_JUMP_HORIZONTAL_FORCE;
+            }
+            
+            // Apply vertical force upward (stronger for better jumps)
+            velocity.y = WALL_JUMP_VERTICAL_FORCE * 1.1f;
             
             // Set to jumping state
             isJumping = true;
+            isWallRunning = false; // End wall running
             setAnimationState(AnimationState.JUMPING);
             
             // Reset cooldown
@@ -436,43 +462,7 @@ public class Player {
                 effectsManager.createJumpEffect(position, true);
             }
             
-            logger.info("Player wall-jumped from wall at direction: " + wallDirection);
-        }
-    }
-    
-    /**
-     * Makes the player jump while wall running.
-     */
-    public void wallRunJump() {
-        if (isWallRunning && jumpCooldown <= 0) {
-            // Calculate jump direction
-            Vector3 jumpDirection = new Vector3();
-            
-            // Jump away from wall with wall normal
-            jumpDirection.x = wallNormal.x * WALL_JUMP_HORIZONTAL_FORCE * 0.8f;
-            
-            // Keep some forward momentum
-            jumpDirection.z = velocity.z * 0.8f;
-            
-            // Apply jump forces
-            velocity.x = jumpDirection.x;
-            velocity.z = jumpDirection.z;
-            velocity.y = WALL_JUMP_VERTICAL_FORCE;
-            
-            // End wall running
-            isWallRunning = false;
-            isJumping = true;
-            setAnimationState(AnimationState.JUMPING);
-            
-            // Reset cooldown
-            jumpCooldown = JUMP_COOLDOWN;
-            
-            // Create jump effect
-            if (effectsManager != null) {
-                effectsManager.createJumpEffect(position, true);
-            }
-            
-            logger.info("Player jumped from wall run at position: " + position);
+            logger.info("Player wall-jumped from wall direction: " + wallDirection);
         }
     }
     
