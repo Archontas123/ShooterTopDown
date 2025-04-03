@@ -12,6 +12,8 @@ import io.github.tavuc.platformer.PlatformerGame;
 import io.github.tavuc.platformer.entities.Player;
 import io.github.tavuc.platformer.utils.Logger;
 import io.github.tavuc.platformer.world.GameWorld;
+// Add the new import
+import io.github.tavuc.platformer.effects.EffectsManager;
 
 /**
  * The main game screen that handles the gameplay.
@@ -24,6 +26,9 @@ public class GameScreen implements Screen {
     
     private GameWorld gameWorld;
     private Player player;
+    
+    // Add effects manager
+    private EffectsManager effectsManager;
     
     // Add respawn UI elements
     private BitmapFont font;
@@ -38,6 +43,9 @@ public class GameScreen implements Screen {
         this.game = game;
         this.logger = new Logger("GameScreen");
         this.modelBatch = new ModelBatch();
+        
+        // Initialize effects manager
+        this.effectsManager = new EffectsManager(logger);
         
         // Initialize UI components for respawn message
         this.font = new BitmapFont();
@@ -58,7 +66,9 @@ public class GameScreen implements Screen {
         // Create player at spawn position with slight elevation
         Vector3 spawnPosition = gameWorld.getSpawnPosition();
         spawnPosition.y += 2.5f; // Elevate the player a bit to ensure visibility
-        player = new Player(spawnPosition, logger);
+        
+        // Pass effects manager to player
+        player = new Player(spawnPosition, logger, effectsManager);
         
         // Initial camera update to focus on player
         updateCamera();
@@ -197,6 +207,9 @@ public class GameScreen implements Screen {
         // Update player
         player.update(delta);
         
+        // Update effects manager
+        effectsManager.update(delta);
+        
         // Check if player has fallen off the map
         Vector3 playerPos = player.getPosition();
         if (playerPos.y < gameWorld.getDeathHeight()) {
@@ -302,6 +315,9 @@ public class GameScreen implements Screen {
             logger.error("Player object is null during rendering!");
         }
         
+        // Render effects
+        effectsManager.render(modelBatch, game.getEnvironment());
+        
         modelBatch.end();
     }
     
@@ -356,6 +372,7 @@ public class GameScreen implements Screen {
         modelBatch.dispose();
         gameWorld.dispose();
         player.dispose();
+        effectsManager.dispose();
         font.dispose();
         batch.dispose();
     }
