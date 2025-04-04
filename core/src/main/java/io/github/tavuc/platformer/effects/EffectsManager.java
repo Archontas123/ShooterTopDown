@@ -115,13 +115,21 @@ public class EffectsManager implements Disposable {
     public void createWallSlideEffect(Vector3 position, Vector3 wallNormal) {
         tempVector.set(position);
         
+        // Create particles that appear to slide down the wall
         for (int i = 0; i < 2; i++) { 
             float offsetY = -0.1f + (float)Math.random() * 0.2f;
             
-            tempVector.set(position).add(0, offsetY, 0);
+            // Calculate position slightly offset from the wall
+            Vector3 particlePos = new Vector3(position).add(
+                wallNormal.x * 0.1f,
+                offsetY,
+                wallNormal.z * 0.1f
+            );
             
-            particleEffect.createDustEffect(tempVector, WALL_SLIDE_COLOR, 1);
+            particleEffect.createDustEffect(particlePos, WALL_SLIDE_COLOR, 1);
         }
+        
+        logger.debug("Created wall slide effect at: " + position);
     }
     
     /**
@@ -135,20 +143,43 @@ public class EffectsManager implements Disposable {
         tempVector.set(position);
         
         float direction = Math.signum(forwardSpeed);
+        Vector3 moveDir = new Vector3();
+        
+        // Determine movement direction based on wall orientation
+        if (Math.abs(wallNormal.x) > 0.9f) {
+            // Wall facing X direction, movement is along Z
+            moveDir.set(0, 0, direction);
+        } else if (Math.abs(wallNormal.z) > 0.9f) {
+            // Wall facing Z direction, movement is along X
+            moveDir.set(direction, 0, 0);
+        }
         
         for (int i = 0; i < 3; i++) {
             float offsetY = -0.3f + (float)Math.random() * 0.6f;
-            float offsetZ = direction * ((float)Math.random() * 0.5f);
             
-            tempVector.set(position).add(0, offsetY, offsetZ);
+            // Position particle slightly away from wall
+            Vector3 particlePos = new Vector3(position).add(
+                wallNormal.x * 0.1f,
+                offsetY,
+                wallNormal.z * 0.1f
+            );
+            
+            // Add slight offset in movement direction
+            particlePos.add(
+                moveDir.x * ((float)Math.random() * 0.5f),
+                0,
+                moveDir.z * ((float)Math.random() * 0.5f)
+            );
             
             particleEffect.createStretchedEffect(
-                tempVector,
-                new Vector3(0, 0, direction), 
+                particlePos,
+                moveDir, 
                 WALL_RUN_COLOR,
                 0.8f + (float)Math.random() * 0.4f 
             );
         }
+        
+        logger.debug("Created wall run effect at: " + position + " with direction: " + moveDir);
     }
     
     /**
@@ -197,5 +228,60 @@ public class EffectsManager implements Disposable {
         }
         
         logger.debug("Created jump effect at: " + position + " (jumping up: " + jumpingUp + ")");
+    }
+    
+    /**
+     * Creates a wall jump effect at the specified position.
+     *
+     * @param position The position of the player
+     * @param wallNormal The normal vector of the wall
+     */
+    public void createWallJumpEffect(Vector3 position, Vector3 wallNormal) {
+        Color color = new Color(1.0f, 0.8f, 0.3f, 1.0f);
+        int count = 15;
+        
+        // Direction to spawn particles (away from wall)
+        Vector3 jumpDir = new Vector3(wallNormal).nor();
+        
+        for (int i = 0; i < count; i++) {
+            Vector3 effectPos = new Vector3(position);
+            
+            // Spawn in a cone shape away from the wall
+            float angle = MathUtils.random(-45, 45) * MathUtils.degreesToRadians;
+            float radius = MathUtils.random(0.2f, 0.5f);
+            
+            // Create a rotation matrix to rotate jumpDir around the Y axis
+            float cosAngle = MathUtils.cos(angle);
+            float sinAngle = MathUtils.sin(angle);
+            
+            Vector3 rotatedDir = new Vector3();
+            if (Math.abs(jumpDir.x) > 0.9f) {
+                // Rotate around Y for X-aligned walls
+                rotatedDir.x = jumpDir.x * cosAngle - jumpDir.z * sinAngle;
+                rotatedDir.y = 0;
+                rotatedDir.z = jumpDir.x * sinAngle + jumpDir.z * cosAngle;
+            } else {
+                // Rotate around Y for Z-aligned walls
+                rotatedDir.x = jumpDir.x * cosAngle + jumpDir.z * sinAngle;
+                rotatedDir.y = 0;
+                rotatedDir.z = -jumpDir.x * sinAngle + jumpDir.z * cosAngle;
+            }
+            
+            effectPos.add(
+                rotatedDir.x * radius,
+                MathUtils.random(-0.3f, 0.3f),
+                rotatedDir.z * radius
+            );
+            
+            // Create stretched effect in the jump direction
+            particleEffect.createStretchedEffect(
+                effectPos,
+                rotatedDir,
+                color,
+                MathUtils.random(0.5f, 1.0f)
+            );
+        }
+        
+        logger.debug("Created wall jump effect at: " + position);
     }
 }
